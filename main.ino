@@ -1,33 +1,27 @@
 /*
-  ESP32 DevKit – 6× kontinuální servo SG90 360° + WiFiManager + WebServer + EEPROM config
+  ESP32 DevKit – 6× kontinuální servo SG90 360°
+  + WiFiManager + WebServer + LittleFS config + sekvence
 
-  Verze pro kontinuální serva:
-  - POZOR: Tohle NENÍ polohové řízení (°), ale řízení SMĚRU a VÝKONU.
-  - Kontinuální SG90 360° neumí držet úhel, jen se točit jako motorek s převodem.
-
-  Logika:
-  - Po spuštění se serva NEPŘESTAVUJÍ, jsou v klidu (neposílá se PWM).
+  Kontinuální SG90 360°:
+  - Řídíme SMĚR a VÝKON, ne polohu.
   - Parametr "power" = -100…+100:
-      - 0   = stop (cca 1500 µs)
-      - +100 = plná rychlost doprava
-      - -100 = plná rychlost doleva
-  - CENTER = power = 0 (servo zastavené, ale attach = držíme neutrál pulzem)
-  - STOP   = detach (servo volné, PWM se neposílá)
+      0     = stop (cca 1500 µs)
+      +100  = plná rychlost jedním směrem
+      -100  = plná rychlost opačným směrem
 
-  WebUI:
-  - Globální "Krok výkonu (%)" – o kolik % se změní výkon při LEVO/PRAVO.
-  - U každého serva: LEVO / CENTER / PRAVO / STOP.
-  - CENTER ALL, STOP ALL.
-  - Zpětná vazba: výkon v %, stav AKTIVNÍ/STOP (aktualizace každé 2 s).
-  - Konfigurace GPIO:
-      - Pro každé servo výběr GPIO z nabídky.
-      - Po změně se servo odpojí (STOP) a nastaví se nový pin.
-      - Tlačítko „Uložit konfiguraci“ uloží GPIO + krok výkonu do EEPROM.
-
-  Potřebné knihovny:
-  - ESP32Servo (ESP32Servo.h)
-  - WiFiManager (WiFiManager.h)
-  - EEPROM (EEPROM.h) – emulovaná EEPROM v flashi ESP32
+  LittleFS:
+  - /index.html        – web UI (nahraješ přes LittleFS uploader, složka /data)
+  - /config.txt        – konfigurace kroku výkonu + mapování servo→GPIO
+      STEP=10
+      PIN0=13
+      PIN1=14
+      ...
+      PIN5=32
+  - /seq_<name>.txt    – sekvence příkazů pro serva (text, jeden příkaz na řádek)
+      servo,power,duration_ms
+      0,50,1000
+      0,0,500
+      1,-30,1500
 */
 
 #include <Arduino.h>
@@ -35,13 +29,12 @@
 #include <WebServer.h>
 #include <WiFiManager.h>   // https://github.com/tzapu/WiFiManager
 #include <ESP32Servo.h>    // https://github.com/madhephaestus/ESP32Servo
-#include <SPIFFS.h>        // SPIFFS pro ukládání konfigurace
+#include <LittleFS.h>      // LittleFS pro ukládání konfigurace a souborů
 
 // ====== KONFIGURACE SERV ======
 const uint8_t SERVO_COUNT = 6;
 
 // Výchozí (kompilované) mapování servo -> GPIO pro ESP32 DevKit
-// Reálné mapování se při startu přepíše z EEPROM, pokud je v ní platná konfigurace.
 uint8_t SERVO_PINS[SERVO_COUNT] = {
   13, // Servo 0
   14, // Servo 1
@@ -52,7 +45,6 @@ uint8_t SERVO_PINS[SERVO_COUNT] = {
 };
 
 // Použitelné GPIO pro serva na ESP32 DevKit (PWM schopné, ne flash/USB/UART0)
-// Tohle je seznam, který nabízíme v UI pro výběr:
 const uint8_t GPIO_OPTIONS[] = {
   2, 4, 5,
   12, 13, 14, 15,
@@ -64,26 +56,30 @@ const uint8_t GPIO_OPTIONS[] = {
 const uint8_t GPIO_OPTION_COUNT = sizeof(GPIO_OPTIONS) / sizeof(GPIO_OPTIONS[0]);
 
 // Kontinuální SG90 360° – PWM v mikrosekundách
-// Tyto hodnoty jsou typické, ale neutrál může být mírně posunutý.
 const int SERVO_MIN_US     = 1000;  // plná rychlost jedním směrem
 const int SERVO_MAX_US     = 2000;  // plná rychlost druhým směrem
-const int SERVO_NEUTRAL_US = 1500;  // ideálně stop (střed)
+const int SERVO_NEUTRAL_US = 1500;  // ideálně stop (střed) – zatím nepoužito per-servo
 
-// ====== SPIFFS KONFIG ======
+// ====== LittleFS KONFIG ======
 const char *CONFIG_PATH = "/config.txt";
 
+// Sekvence – soubory typu /seq_<name>.txt
+const char *SEQ_PREFIX      = "/seq_";
+const size_t SEQ_PREFIX_LEN = 5;     // délka "/seq_"
+const char *SEQ_EXT         = ".txt";
+const size_t SEQ_EXT_LEN    = 4;
+
 // ====== STAV SERV ======
-Servo servos[SERVO_COUNT];
+Servo  servos[SERVO_COUNT];
 
 // Výkon v procentech -100..+100 (interní reprezentace)
 int  currentPower[SERVO_COUNT];   // -100..100, 0 = stop
 bool servoAttached[SERVO_COUNT];  // jestli je servo připojeno (PWM aktivní)
 
 // Krok výkonu v procentech (změna power při LEVO/PRAVO tlačítku)
-// Hodnota se načítá/ukládá do EEPROM
 int defaultPowerStep = 10;        // 10 % na jedno kliknutí
 
-WebServer server(80);
+WebServer   server(80);
 WiFiManager wm;
 
 // ====== POMOCNÉ FUNKCE ======
@@ -102,21 +98,23 @@ bool isValidGpio(uint8_t gpio) {
   return false;
 }
 
-// SPIFFS: načtení nebo inicializace defaultů
+// LittleFS: načtení nebo inicializace defaultů
 void loadOrInitConfig() {
   // výchozí hodnoty
   defaultPowerStep = 10;
 
-  if (!SPIFFS.exists(CONFIG_PATH)) {
-    // žádná konfigurace – zůstanou kompilované defaulty SERVO_PINS + STEP=10
+  if (!LittleFS.exists(CONFIG_PATH)) {
+    Serial.println("Config: config.txt neexistuje, pouziji defaulty.");
     return;
   }
 
-  File f = SPIFFS.open(CONFIG_PATH, "r");
+  File f = LittleFS.open(CONFIG_PATH, "r");
   if (!f) {
-    Serial.println("Config: nelze otevrit config.txt, pouziji se defaulty");
+    Serial.println("Config: nelze otevrit config.txt, pouziji defaulty.");
     return;
   }
+
+  Serial.println("Config: nacitam config.txt");
 
   while (f.available()) {
     String line = f.readStringUntil('\n');
@@ -129,7 +127,7 @@ void loadOrInitConfig() {
         defaultPowerStep = val;
       }
     } else if (line.startsWith("PIN")) {
-      // očekávaný formát: PIN<index>=<gpio>, např. PIN0=13
+      // formát: PIN<index>=<gpio>, např. PIN0=13
       int eqPos = line.indexOf('=');
       if (eqPos > 3) {
         int idx  = line.substring(3, eqPos).toInt();
@@ -144,16 +142,15 @@ void loadOrInitConfig() {
   f.close();
 }
 
-// SPIFFS: uložení konfigurace do textového souboru
-void saveConfigToSPIFFS() {
-  File f = SPIFFS.open(CONFIG_PATH, "w");
+// LittleFS: uložení konfigurace do textového souboru
+void saveConfigToLittleFS() {
+  File f = LittleFS.open(CONFIG_PATH, "w");
   if (!f) {
     Serial.println("Config: nelze zapsat config.txt");
     return;
   }
 
   f.println("# Konfigurace servo testeru");
-
   f.print("STEP=");
   f.println(clampInt(defaultPowerStep, 1, 100));
 
@@ -165,7 +162,7 @@ void saveConfigToSPIFFS() {
   }
 
   f.close();
-  Serial.println("Config: ulozeno do SPIFFS (config.txt)");
+  Serial.println("Config: ulozeno do LittleFS (config.txt)");
 }
 
 // Zajistí, že servo je připojeno (PWM běží) – pokud ještě nebylo, připojí ho.
@@ -182,7 +179,6 @@ void ensureServoAttached(uint8_t index) {
 // Přepočet power -100..100 na puls v mikrosekundách
 int powerToPulse(int power) {
   power = clampInt(power, -100, 100);
-  // lineární mapování -100..100 -> SERVO_MIN_US..SERVO_MAX_US
   long p = map(power, -100, 100, SERVO_MIN_US, SERVO_MAX_US);
   return (int)p;
 }
@@ -210,177 +206,42 @@ void stopServo(uint8_t index) {
   currentPower[index] = 0;  // logický stav = stop
 }
 
-// ====== HTTP HANDLERY ======
+// ====== SEKVENCE – pomocné funkce v LittleFS ======
 
-// Jednoduché HTML WebUI
+String makeSeqPath(const String &nameRaw) {
+  // jednoduché "čištění" jména: nepovolené znaky nahradíme podtržítkem
+  String name = nameRaw;
+  name.trim();
+  if (name.length() == 0) name = "noname";
+
+  for (int i = 0; i < name.length(); i++) {
+    char c = name[i];
+    bool ok = (c >= '0' && c <= '9') ||
+              (c >= 'A' && c <= 'Z') ||
+              (c >= 'a' && c <= 'z') ||
+              c == '_' || c == '-';
+    if (!ok) name[i] = '_';
+  }
+
+  String path = String(SEQ_PREFIX) + name + String(SEQ_EXT);
+  return path; // např. /seq_walk.txt
+}
+
+// ====== HTTP HANDLERY – UI a základní API ======
+
+// /  -> servíruje /index.html z LittleFS
 void handleRoot() {
-  String html;
-
-  html += F(
-    "<!DOCTYPE html>"
-    "<html lang='cs'>"
-    "<head>"
-    "<meta charset='UTF-8'>"
-    "<meta name='viewport' content='width=device-width, initial-scale=1.0'>"
-    "<title>ESP32 Servo Tester (kontinuální)</title>"
-    "<style>"
-      "body{font-family:Arial,sans-serif;margin:0;padding:1rem;background:#111;color:#eee;}"
-      "h1{text-align:center;}"
-      ".card{background:#222;border-radius:8px;padding:1rem;margin:0.5rem auto;max-width:800px;box-shadow:0 0 10px rgba(0,0,0,0.5);}"
-      ".servo-row{display:flex;align-items:center;justify-content:space-between;margin:0.3rem 0;gap:0.5rem;flex-wrap:wrap;}"
-      ".servo-label{min-width:150px;}"
-      "button{padding:0.4rem 0.8rem;border:none;border-radius:4px;margin:0.1rem;cursor:pointer;background:#444;color:#eee;}"
-      "button:hover{background:#666;}"
-      "input,select{padding:0.2rem;border-radius:4px;border:1px solid #555;background:#111;color:#eee;}"
-      "input{width:4rem;text-align:center;}"
-      ".center-btn{background:#0066aa;}"
-      ".center-btn:hover{background:#0099ff;}"
-      ".stop-btn{background:#aa3300;}"
-      ".stop-btn:hover{background:#ff4400;}"
-      ".small{font-size:0.85rem;color:#aaa;}"
-    "</style>"
-    "</head>"
-    "<body>"
-    "<h1>ESP32 Servo Tester – SG90 360°</h1>"
-    "<div class='card'>"
-    "<h2>Globální nastavení</h2>"
-    "<div>"
-      "<label>Krok výkonu (%): <input id='stepPower' type='number' min='1' max='100' value='"
-  );
-
-  html += String(defaultPowerStep);
-  html += F(
-      "'></label><br>"
-      "<p class='small'>LEVO/PRAVO mění výkon o daný počet procent. 0&nbsp;% = STOP, ±100&nbsp;% = plná rychlost.</p>"
-      "<button class='center-btn' onclick='centerAll()'>CENTER ALL (STOP)</button>"
-      "<button class='stop-btn' onclick='stopAll()'>STOP ALL (DETACH)</button>"
-    "</div>"
-    "</div>"
-  );
-
-  // Konfigurace GPIO
-  html += F(
-    "<div class='card'>"
-    "<h2>Konfigurace GPIO</h2>"
-    "<div>"
-    "<p class='small'>Vyber GPIO pro jednotlivá serva. Po změně GPIO se dané servo zastaví (STOP). "
-    "Pro trvalé uložení konfigurace (včetně kroku výkonu) klikni na &bdquo;Uložit konfiguraci&ldquo;.</p>"
-  );
-
-  for (uint8_t i = 0; i < SERVO_COUNT; i++) {
-    html += "<div class='servo-row'>"
-              "<div class='servo-label'>Servo " + String(i) + " GPIO:</div>"
-              "<div><select id='servo_pin_" + String(i) + "' onchange='setServoPin(" + String(i) + ")'>";
-
-    for (uint8_t g = 0; g < GPIO_OPTION_COUNT; g++) {
-      uint8_t gpio = GPIO_OPTIONS[g];
-      html += "<option value='" + String(gpio) + "'";
-      if (gpio == SERVO_PINS[i]) {
-        html += " selected";
-      }
-      html += ">GPIO" + String(gpio) + "</option>";
-    }
-
-    html += "</select></div></div>";
+  if (!LittleFS.exists("/index.html")) {
+    server.send(500, "text/plain", "index.html not found in LittleFS");
+    return;
   }
-
-  html += F(
-    "<button class='center-btn' onclick='saveConfig()'>Uložit konfiguraci</button>"
-    "</div>"
-    "</div>"
-  );
-
-  // Ovládání serv
-  html += F(
-    "<div class='card'>"
-    "<h2>Serva</h2>"
-  );
-
-  // Dynamicky vytvořit řádky pro 6 serv
-  for (uint8_t i = 0; i < SERVO_COUNT; i++) {
-    html += "<div class='servo-row'>"
-              "<div class='servo-label'>Servo " + String(i) +
-              " <span id='servo_state_" + String(i) + "' class='small'>(stav neznámý)</span></div>"
-              "<div>"
-                "<button onclick='moveServo(" + String(i) + ",-1)'>&#9664; LEVO</button>"
-                "<button onclick='centerServo(" + String(i) + ")'>CENTER (0&nbsp;%)</button>"
-                "<button onclick='moveServo(" + String(i) + ",1)'>PRAVO &#9654;</button>"
-                "<button class='stop-btn' onclick='stopServoBtn(" + String(i) + ")'>STOP</button>"
-              "</div>"
-            "</div>";
+  File f = LittleFS.open("/index.html", "r");
+  if (!f) {
+    server.send(500, "text/plain", "Cannot open index.html");
+    return;
   }
-
-  html += F(
-    "</div>"
-    "<script>"
-    "function getStep(){"
-      "let v=parseInt(document.getElementById('stepPower').value);"
-      "if(isNaN(v)) v=10;"
-      "if(v<1) v=1;"
-      "if(v>100) v=100;"
-      "return v;"
-    "}"
-    "function moveServo(index,dir){"
-      "let step=getStep();"
-      "let url='/api/move?servo='+index+'&dir='+dir+'&step='+step;"
-      "fetch(url).then(_=>refreshStatus()).catch(e=>console.log(e));"
-    "}"
-    "function centerServo(index){"
-      "let url='/api/center_one?servo='+index;"
-      "fetch(url).then(_=>refreshStatus()).catch(e=>console.log(e));"
-    "}"
-    "function centerAll(){"
-      "let url='/api/center_all';"
-      "fetch(url).then(_=>refreshStatus()).catch(e=>console.log(e));"
-    "}"
-    "function stopServoBtn(index){"
-      "let url='/api/stop_one?servo='+index;"
-      "fetch(url).then(_=>refreshStatus()).catch(e=>console.log(e));"
-    "}"
-    "function stopAll(){"
-      "let url='/api/stop_all';"
-      "fetch(url).then(_=>refreshStatus()).catch(e=>console.log(e));"
-    "}"
-    "function setServoPin(index){"
-      "let sel=document.getElementById('servo_pin_'+index);"
-      "if(!sel) return;"
-      "let gpio=sel.value;"
-      "let url='/api/set_pin?servo='+index+'&gpio='+gpio;"
-      "fetch(url).then(_=>refreshStatus()).catch(e=>console.log(e));"
-    "}"
-    "function saveConfig(){"
-      "let step=getStep();"
-      "let url='/api/save_config?step='+step;"
-      "fetch(url)"
-        ".then(r=>r.text())"
-        ".then(t=>{alert(t);})"
-        ".catch(e=>console.log(e));"
-    "}"
-    "function refreshStatus(){"
-      "fetch('/api/status')"
-        ".then(r=>r.json())"
-        ".then(data=>{"
-          "if(!data.servos) return;"
-          "data.servos.forEach(s=>{"
-            "let el=document.getElementById('servo_state_'+s.index);"
-            "if(el){"
-              "let st=s.attached?'AKTIVNÍ':'STOP';"
-              "el.textContent='(výkon '+s.power+' %, '+st+')';"
-            "}"
-          "});"
-        "})"
-        ".catch(e=>console.log(e));"
-    "}"
-    "window.addEventListener('load',()=>{"
-      "refreshStatus();"
-      "setInterval(refreshStatus,2000);"
-    "});"
-    "</script>"
-    "</body>"
-    "</html>"
-  );
-
-  server.send(200, "text/html", html);
+  server.streamFile(f, "text/html");
+  f.close();
 }
 
 // API: /api/move?servo=0&dir=1&step=10
@@ -477,7 +338,7 @@ void handleApiStopAll() {
   server.send(200, "text/plain", "All servos stopped (detached, power = 0 %)");
 }
 
-// API: /api/set_pin?servo=0&gpio=13 -> přiřazení GPIO k servu
+// API: /api/set_pin?servo=0&gpio=13 -> změna GPIO pro servo
 void handleApiSetPin() {
   if (!server.hasArg("servo") || !server.hasArg("gpio")) {
     server.send(400, "text/plain", "Missing servo or gpio");
@@ -497,9 +358,8 @@ void handleApiSetPin() {
     return;
   }
 
-  // Při změně pinu servo zastavíme a odpojíme pro bezpečnost
+  // pro jistotu servo zastavíme a odpojíme
   stopServo(index);
-
   SERVO_PINS[index] = (uint8_t)gpio;
 
   String resp = "Servo ";
@@ -509,16 +369,23 @@ void handleApiSetPin() {
   server.send(200, "text/plain", resp);
 }
 
-// API: /api/save_config?step=10 -> uloží SERVO_PINS[] + defaultPowerStep do EEPROM
+// API: /api/save_config?step=10
+// Uloží SERVO_PINS[] + defaultPowerStep do LittleFS a zastaví všechna serva
 void handleApiSaveConfig() {
   if (server.hasArg("step")) {
     int step = server.arg("step").toInt();
     defaultPowerStep = clampInt(step, 1, 100);
   }
 
-  saveConfigToSPIFFS();
+  saveConfigToLittleFS();
 
-  server.send(200, "text/plain", "Konfigurace uložena do SPIFFS (config.txt)");
+  // po uložení zastavíme všechna serva
+  for (uint8_t i = 0; i < SERVO_COUNT; i++) {
+    stopServo(i);
+  }
+
+  server.send(200, "text/plain",
+              "Konfigurace ulozena do LittleFS (config.txt), serva zastavena");
 }
 
 // API: /api/status – JSON se stavem všech serv
@@ -537,6 +404,180 @@ void handleApiStatus() {
   server.send(200, "application/json", json);
 }
 
+// ====== HTTP HANDLERY – sekvence ======
+
+// /api/seq_list -> {"seq":["nazev1","nazev2",...]}
+void handleApiSeqList() {
+  File root = LittleFS.open("/");
+  if (!root) {
+    server.send(500, "text/plain", "LittleFS root open failed");
+    return;
+  }
+
+  String json = "{\"seq\":[";
+  bool first = true;
+
+  File file = root.openNextFile();
+  while (file) {
+    String fname = file.name(); // např. "/seq_walk.txt"
+    if (fname.startsWith(SEQ_PREFIX) && fname.endsWith(SEQ_EXT)) {
+      String base = fname.substring(SEQ_PREFIX_LEN,
+                                    fname.length() - SEQ_EXT_LEN);
+      if (!first) json += ",";
+      first = false;
+      json += "\"" + base + "\"";
+    }
+    file = root.openNextFile();
+  }
+
+  json += "]}";
+  server.send(200, "application/json", json);
+}
+
+// /api/seq_get?name=nazev -> vrátí obsah sekvence (text)
+void handleApiSeqGet() {
+  if (!server.hasArg("name")) {
+    server.send(400, "text/plain", "Missing name");
+    return;
+  }
+
+  String name = server.arg("name");
+  String path = makeSeqPath(name);
+
+  if (!LittleFS.exists(path)) {
+    server.send(404, "text/plain", "Sequence not found");
+    return;
+  }
+
+  File f = LittleFS.open(path, "r");
+  if (!f) {
+    server.send(500, "text/plain", "Cannot open sequence file");
+    return;
+  }
+
+  String content = f.readString();
+  f.close();
+
+  server.send(200, "text/plain", content);
+}
+
+// /api/seq_save?name=nazev (POST, body = obsah)
+// uloží nebo přepíše sekvenci
+void handleApiSeqSave() {
+  if (!server.hasArg("name")) {
+    server.send(400, "text/plain", "Missing name");
+    return;
+  }
+
+  String name = server.arg("name");
+  String path = makeSeqPath(name);
+  String body = server.arg("plain"); // raw body
+
+  File f = LittleFS.open(path, "w");
+  if (!f) {
+    server.send(500, "text/plain", "Cannot write sequence file");
+    return;
+  }
+
+  f.print(body);
+  f.close();
+
+  server.send(200, "text/plain", "Sequence saved");
+}
+
+// /api/seq_delete?name=nazev -> smaže soubor sekvence
+void handleApiSeqDelete() {
+  if (!server.hasArg("name")) {
+    server.send(400, "text/plain", "Missing name");
+    return;
+  }
+
+  String name = server.arg("name");
+  String path = makeSeqPath(name);
+
+  if (LittleFS.exists(path)) {
+    LittleFS.remove(path);
+    server.send(200, "text/plain", "Sequence deleted");
+  } else {
+    server.send(404, "text/plain", "Sequence not found");
+  }
+}
+
+// /api/seq_run?name=nazev -> blokující spuštění sekvence
+// Formát sekvence (textový soubor):
+//   # komentář
+//   servo,power,duration_ms
+//   0,50,1000
+//   0,0,500
+//   1,-30,1500
+void handleApiSeqRun() {
+  if (!server.hasArg("name")) {
+    server.send(400, "text/plain", "Missing name");
+    return;
+  }
+
+  String name = server.arg("name");
+  String path = makeSeqPath(name);
+
+  if (!LittleFS.exists(path)) {
+    server.send(404, "text/plain", "Sequence not found");
+    return;
+  }
+
+  File f = LittleFS.open(path, "r");
+  if (!f) {
+    server.send(500, "text/plain", "Cannot open sequence file");
+    return;
+  }
+
+  // Odpověď pošleme hned, aby prohlížeč nečekal na konec sekvence.
+  server.send(200, "text/plain", "Sequence running (blokuje ESP, UI chvilku nereaguje)");
+
+  Serial.print("Sequence run: ");
+  Serial.println(path);
+
+  while (f.available()) {
+    String line = f.readStringUntil('\n');
+    line.trim();
+    if (line.length() == 0 || line.startsWith("#")) continue;
+
+    int c1 = line.indexOf(',');
+    int c2 = line.indexOf(',', c1 + 1);
+    if (c1 < 0 || c2 < 0) {
+      Serial.print("Seq: invalid line: ");
+      Serial.println(line);
+      continue;
+    }
+
+    int idx   = line.substring(0, c1).toInt();
+    int power = line.substring(c1 + 1, c2).toInt();
+    int dur   = line.substring(c2 + 1).toInt();
+
+    if (idx < 0 || idx >= SERVO_COUNT) {
+      Serial.print("Seq: invalid servo index: ");
+      Serial.println(line);
+      continue;
+    }
+
+    power = clampInt(power, -100, 100);
+    dur   = clampInt(dur, 0, 30000); // max 30 s na příkaz
+
+    Serial.print("Seq cmd: servo=");
+    Serial.print(idx);
+    Serial.print(" power=");
+    Serial.print(power);
+    Serial.print(" dur=");
+    Serial.println(dur);
+
+    setServoPower(idx, power);
+    if (dur > 0) {
+      delay(dur);   // BLOKUJE – jednoduchá implementace pro testování
+    }
+  }
+
+  f.close();
+}
+
 // 404
 void handleNotFound() {
   server.send(404, "text/plain", "Not found");
@@ -545,16 +586,14 @@ void handleNotFound() {
 // ====== SETUP & LOOP ======
 
 void setupServos() {
-  // Připravit PWM timery
   ESP32PWM::allocateTimer(0);
   ESP32PWM::allocateTimer(1);
   ESP32PWM::allocateTimer(2);
   ESP32PWM::allocateTimer(3);
 
-  // Výchozí interní stav – serva v klidu, odpojena
   for (uint8_t i = 0; i < SERVO_COUNT; i++) {
-    currentPower[i]  = 0;     // 0 % = stop
-    servoAttached[i] = false; // servo není připojeno -> klid
+    currentPower[i]  = 0;
+    servoAttached[i] = false;
   }
 }
 
@@ -575,8 +614,8 @@ void setupWiFiAndServer() {
   }
 
   // HTTP routy
-  server.on("/",            HTTP_GET, handleRoot);
-  server.on("/api/move",    HTTP_GET, handleApiMove);
+  server.on("/",               HTTP_GET, handleRoot);
+  server.on("/api/move",       HTTP_GET, handleApiMove);
   server.on("/api/center_one", HTTP_GET, handleApiCenterOne);
   server.on("/api/center_all", HTTP_GET, handleApiCenterAll);
   server.on("/api/stop_one",   HTTP_GET, handleApiStopOne);
@@ -584,6 +623,14 @@ void setupWiFiAndServer() {
   server.on("/api/set_pin",    HTTP_GET, handleApiSetPin);
   server.on("/api/save_config",HTTP_GET, handleApiSaveConfig);
   server.on("/api/status",     HTTP_GET, handleApiStatus);
+
+  // sekvence
+  server.on("/api/seq_list",   HTTP_GET, handleApiSeqList);
+  server.on("/api/seq_get",    HTTP_GET, handleApiSeqGet);
+  server.on("/api/seq_delete", HTTP_GET, handleApiSeqDelete);
+  server.on("/api/seq_run",    HTTP_GET, handleApiSeqRun);
+  server.on("/api/seq_save",   HTTP_POST, handleApiSeqSave);
+
   server.onNotFound(handleNotFound);
 
   server.begin();
@@ -594,15 +641,14 @@ void setup() {
   Serial.begin(115200);
   delay(1000);
   Serial.println();
-  Serial.println("ESP32 Servo Tester – SG90 360° startuje...");
+  Serial.println("ESP32 Servo Tester – SG90 360° + LittleFS + sekvence startuje...");
 
-  // inicializace SPIFFS (true = případně naformátuje při první chybě)
-  if (!SPIFFS.begin(true)) {
-    Serial.println("SPIFFS mount failed, pouziji se pouze default konfigurace");
+  if (!LittleFS.begin(true)) {
+    Serial.println("LittleFS mount failed, pouziji se pouze default konfigurace");
   }
 
-  loadOrInitConfig();   // načti mapování GPIO a krok výkonu ze SPIFFS (nebo dej defaulty)
-  setupServos();        // serva zůstávají fyzicky v klidu (není attach)
+  loadOrInitConfig();   // načte STEP + mapování GPIO z config.txt (nebo nechá defaulty)
+  setupServos();
   setupWiFiAndServer();
 }
 
