@@ -75,9 +75,9 @@ const int SERVO_NEUTRAL_US = 1500;  // střed (stop)
 const char *CONFIG_PATH = "/config.txt";
 
 // Sekvence – soubory typu /seq_<name>.txt
-const char *SEQ_PREFIX      = "/seq_";
-const size_t SEQ_PREFIX_LEN = 5;     // délka "/seq_"
-const char *SEQ_EXT         = ".txt";
+// prefix BEZ lomítka – protože file.name() vrací "seq_xxx.txt"
+const char *SEQ_PREFIX      = "seq_";
+const int   SEQ_PREFIX_LEN  = 4;   // délka "seq_"
 const size_t SEQ_EXT_LEN    = 4;
 
 // ====== STAV SERV ======
@@ -467,6 +467,39 @@ void moveServoByAngle(uint8_t index, int angleDeg, int power) {
 }
 
 // ====== SEKVENCE – pomocné funkce ======
+
+// adresář, kde jsou sekvence
+const char *SEQ_DIR    = "/";
+// prefix a přípona sekvenčních souborů
+//const char *SEQ_PREFIX = "seq_";
+const char *SEQ_EXT    = ".txt";
+
+// Vrátí čistý název souboru bez cesty
+String seqJustName(const String &full) {
+  int slash = full.lastIndexOf('/');
+  if (slash >= 0 && slash + 1 < (int)full.length()) {
+    return full.substring(slash + 1);
+  }
+  return full;
+}
+
+// Zpracuje název jako "seq_chuze.txt" → "chuze"
+String seqBaseName(const String &just) {
+  if (!just.startsWith(SEQ_PREFIX)) return "";
+  if (!just.endsWith(SEQ_EXT))      return "";
+  int pLen = strlen(SEQ_PREFIX);
+  int eLen = strlen(SEQ_EXT);
+  return just.substring(pLen, just.length() - eLen);
+}
+
+// Vytvoří cestu: "chuze_vpred" → "/seq_chuze_vpred.txt"
+String seqPathFromName(const String &name) {
+  String p = "/";
+  p += SEQ_PREFIX;
+  p += name;
+  p += SEQ_EXT;
+  return p;
+}
 
 String makeSeqPath(const String &nameRaw) {
   String name = nameRaw;
@@ -1020,10 +1053,17 @@ void handleApiSeqList() {
 
   File file = root.openNextFile();
   while (file) {
-    String fname = file.name(); // "/seq_xxx.txt"
-    if (fname.startsWith(SEQ_PREFIX) && fname.endsWith(SEQ_EXT)) {
-      String base = fname.substring(SEQ_PREFIX_LEN,
-                                    fname.length() - SEQ_EXT_LEN);
+    String fname = file.name(); // může být "/seq_xxx.txt" nebo "seq_xxx.txt"
+
+    // odstraníme případné počáteční "/" (rozdíl mezi výpisem v LittleFS a ukládáním)
+    if (fname.startsWith("/")) {
+      fname.remove(0, 1);
+    }
+
+    // hledáme soubory seq_<name>.txt v kořeni
+    if (fname.startsWith("seq_") && fname.endsWith(SEQ_EXT)) {
+      // base = část mezi "seq_" a ".txt"
+      String base = fname.substring(4, fname.length() - SEQ_EXT_LEN);
       if (!first) json += ",";
       first = false;
       json += "\"" + base + "\"";
