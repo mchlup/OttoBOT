@@ -104,6 +104,24 @@ int  servoFullTurnMs[SERVO_COUNT];
 long servoCurrentDeg[SERVO_COUNT];
 long servoCenterDeg[SERVO_COUNT];
 
+// Asynchronní plánovač pro časované pulzy a sekvence
+bool          servoPulseActive[SERVO_COUNT];
+unsigned long servoPulseEndTime[SERVO_COUNT];
+
+struct SeqStep {
+  uint8_t  servo;
+  int16_t  power;
+  uint32_t durationMs;
+};
+
+const uint16_t MAX_SEQ_STEPS = 256;
+SeqStep       seqSteps[MAX_SEQ_STEPS];
+uint16_t      seqStepCount = 0;
+uint16_t      seqStepIndex = 0;
+bool          seqRunning   = false;
+bool          seqStepActive = false;
+unsigned long seqStepEndTime = 0;
+
 // Remote ovladač – 6 tlačítek
 // 0: dopředu, 1: dozadu, 2: vlevo, 3: vpravo, 4: otočka vlevo, 5: otočka vpravo
 const uint8_t REMOTE_BTN_COUNT = 6;
@@ -359,6 +377,11 @@ void setServoPower(uint8_t index, int power) {
   power = clampInt(power, -100, 100);
   currentPower[index] = power;
 
+  if (power == 0) {
+    // jakýkoli ruční zápis power=0 ruší případný naplánovaný pulz
+    servoPulseActive[index] = false;
+  }
+
   int pulse = powerToPulse(power);
   servos[index].writeMicroseconds(pulse);
 }
@@ -370,6 +393,33 @@ void stopServo(uint8_t index) {
     servoAttached[index] = false;
   }
   currentPower[index] = 0;
+  servoPulseActive[index] = false;
+}
+
+// Naplánuje zastavení serva po daném čase (ms) – neblokující
+void scheduleServoStop(uint8_t index, int durationMs) {
+  if (index >= SERVO_COUNT) return;
+  durationMs = clampInt(durationMs, 0, 30000);
+  if (durationMs <= 0) {
+    servoPulseActive[index] = false;
+    return;
+  }
+  servoPulseActive[index] = true;
+  servoPulseEndTime[index] = millis() + (uint32_t)durationMs;
+}
+
+// Pravidelně volaná funkce z loop(), která kontroluje, zda už nemá
+// nějaký naplánovaný pulz skončit, a případně servo vypne.
+void processServoPulseScheduler() {
+  unsigned long now = millis();
+  for (uint8_t i = 0; i < SERVO_COUNT; i++) {
+    if (servoPulseActive[i]) {
+      if ((long)(now - servoPulseEndTime[i]) >= 0) {
+        servoPulseActive[i] = false;
+        setServoPower(i, 0);
+      }
+    }
+  }
 }
 
 // ===== Kalibrace – výpočet času pro daný úhel =====
@@ -408,9 +458,10 @@ void moveServoByAngle(uint8_t index, int angleDeg, int power) {
 
   int dur = computeDurationForAngle(index, angleDeg, absPower);
 
+  // Neblokující varianta – servo rozjedeme a časované vypnutí
+  // zajistí plánovač v loop().
   setServoPower(index, cmdPower);
-  delay(dur);
-  setServoPower(index, 0);
+  scheduleServoStop(index, dur);
 
   servoCurrentDeg[index] += angleDeg;
 }
@@ -479,7 +530,7 @@ void handleUpdateFinished() {
   if (ok) {
     server.send(200, "text/plain", "Update OK, rebooting...");
     Serial.println("Update OK, rebooting...");
-    delay(500);
+    // okamžitý restart bez blokujícího delay()
     ESP.restart();
   } else {
     server.send(500, "text/plain", "Update FAILED");
@@ -519,8 +570,8 @@ void handleApiMove() {
   setServoPower(index, newPower);
 
   int dur = clampInt(pulseDurationMs, 10, 5000);
-  delay(dur);
-  setServoPower(index, 0);
+  // Neblokující pulz – servo se po daném čase vypne v plánovači.
+  scheduleServoStop(index, dur);
 
   String resp = "Servo ";
   resp += index;
@@ -1052,7 +1103,7 @@ void handleApiSeqDelete() {
   }
 }
 
-// /api/seq_run?name=xxx   (blokující – jednoduchá verze)
+// /api/seq_run?name=xxx   (neblokující – sekvence běží na pozadí)
 void handleApiSeqRun() {
   if (!server.hasArg("name")) {
     server.send(400, "text/plain", "Missing name");
@@ -1067,19 +1118,24 @@ void handleApiSeqRun() {
     return;
   }
 
+  // zastavíme případnou předchozí sekvenci a vynulujeme serva
+  seqRunning    = false;
+  seqStepCount  = 0;
+  seqStepIndex  = 0;
+  seqStepActive = false;
+  for (uint8_t i = 0; i < SERVO_COUNT; i++) {
+    setServoPower(i, 0);
+  }
+
   File f = LittleFS.open(path, "r");
   if (!f) {
     server.send(500, "text/plain", "Cannot open sequence file");
     return;
   }
 
-  server.send(200, "text/plain",
-              "Sequence running (blokuje ESP, UI chvilku nereaguje)");
+  uint16_t count = 0;
 
-  Serial.print("Sequence run: ");
-  Serial.println(path);
-
-  while (f.available()) {
+  while (f.available() && count < MAX_SEQ_STEPS) {
     String line = f.readStringUntil('\n');
     line.trim();
     if (line.length() == 0 || line.startsWith("#")) continue;
@@ -1112,18 +1168,77 @@ void handleApiSeqRun() {
     Serial.print(" dur=");
     Serial.println(dur);
 
-    setServoPower(idx, power);
-    if (dur > 0) {
-      delay(dur);
-    }
+    SeqStep &st = seqSteps[count++];
+    st.servo      = (uint8_t)idx;
+    st.power      = (int16_t)power;
+    st.durationMs = (uint32_t)dur;
   }
 
   f.close();
 
-  // Po dojetí sekvence pro jistotu všechna serva nastavíme do "CENTER" (power=0 %).
-  // Pokud sekvence obsahovala poslední krok s power!=0, tímto se zamezí trvalému běhu.
-  for (uint8_t i = 0; i < SERVO_COUNT; i++) {
-    setServoPower(i, 0);
+  if (count == 0) {
+    server.send(400, "text/plain", "Sequence empty or invalid");
+    return;
+  }
+
+  seqStepCount  = count;
+  seqStepIndex  = 0;
+  seqStepActive = false;
+  seqRunning    = true;
+  seqStepEndTime = millis();
+
+  server.send(200, "text/plain",
+              "Sequence scheduled (běží asynchronně na pozadí)");
+
+  Serial.print("Sequence scheduled: ");
+  Serial.print(path);
+  Serial.print(" steps=");
+  Serial.println(seqStepCount);
+}
+
+// Plánovač kroků sekvence – volat pravidelně z loop()
+void processSequenceScheduler() {
+  if (!seqRunning) return;
+
+  unsigned long now = millis();
+
+  if (!seqStepActive) {
+    // žádný krok neběží – zkusíme spustit další
+    if (seqStepIndex >= seqStepCount) {
+      // konec sekvence – vypneme všechna serva
+      for (uint8_t i = 0; i < SERVO_COUNT; i++) {
+        setServoPower(i, 0);
+      }
+      seqRunning = false;
+      Serial.println("Sequence finished.");
+      return;
+    }
+
+    SeqStep &st = seqSteps[seqStepIndex++];
+
+    Serial.print("Seq step: servo=");
+    Serial.print(st.servo);
+    Serial.print(" power=");
+    Serial.print(st.power);
+    Serial.print(" dur=");
+    Serial.println(st.durationMs);
+
+    setServoPower(st.servo, st.power);
+
+    if (st.durationMs > 0) {
+      seqStepActive  = true;
+      seqStepEndTime = now + st.durationMs;
+    } else {
+      // krok bez prodlevy – další krok se připraví v dalším průchodu
+      seqStepActive  = false;
+      seqStepEndTime = now;
+    }
+    return;
+  }
+
+  // nějaký krok právě běží – zkontrolujeme, zda nevypršel čas
+  if ((long)(now - seqStepEndTime) >= 0) {
+    seqStepActive = false;
   }
 }
 
@@ -1153,8 +1268,8 @@ void setupWiFiAndServer() {
   bool res = wm.autoConnect("ServoTesterAP");
 
   if (!res) {
-    Serial.println("WiFi failed, restarting in 5s...");
-    delay(5000);
+    Serial.println("WiFi failed, restarting...");
+    // okamžitý restart bez blokujícího čekání
     ESP.restart();
   } else {
     Serial.println("WiFi connected.");
@@ -1222,7 +1337,6 @@ void setupWiFiAndServer() {
 
 void setup() {
   Serial.begin(115200);
-  delay(1000);
   Serial.println();
   Serial.println("ESP32 Servo Tester – SG90 360° + LittleFS + sekvence startuje...");
 
@@ -1238,4 +1352,8 @@ void setup() {
 void loop() {
   server.handleClient();
   ArduinoOTA.handle();
+
+  // neblokující plánovače pro pulzy a sekvence
+  processServoPulseScheduler();
+  processSequenceScheduler();
 }
