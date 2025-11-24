@@ -2,7 +2,7 @@
 <html lang="cs">
 <head>
   <meta charset="UTF-8">
-  <title>ESP32 Servo Tester 360°</title>
+  <title>Otto ESP32 – Robot & Servo Tester 360°</title>
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <style>
     :root{
@@ -35,7 +35,7 @@
     main{
       width:100%;
       max-width:1180px;
-      background:rgba(5,7,18,0.92);
+      background:rgba(5,7,18,0.96);
       border-radius:24px;
       box-shadow:var(--shadow-lg);
       border:1px solid rgba(255,255,255,0.05);
@@ -45,7 +45,7 @@
     header{
       display:flex;
       justify-content:space-between;
-      align-items:center;
+      align-items:flex-start;
       gap:14px;
       margin-bottom:14px;
     }
@@ -64,7 +64,26 @@
       background:#111320;
       border:1px solid rgba(255,255,255,0.08);
       color:var(--text-muted);
+      white-space:nowrap;
     }
+    .mode-badges{
+      display:flex;
+      gap:6px;
+      margin-top:4px;
+      font-size:0.7rem;
+    }
+    .mode-pill{
+      padding:3px 8px;
+      border-radius:999px;
+      border:1px solid rgba(255,255,255,0.06);
+      background:#111320;
+      color:var(--text-muted);
+    }
+    .mode-pill.child{
+      border-color:rgba(61,123,255,0.8);
+      color:#dbe4ff;
+    }
+
     .tabs{
       display:flex;
       gap:6px;
@@ -83,6 +102,7 @@
       color:var(--text-muted);
       cursor:pointer;
       transition:.18s;
+      white-space:nowrap;
     }
     .tab-btn.active{
       background:linear-gradient(135deg,#3d7bff,#15c47e);
@@ -95,6 +115,7 @@
     .tab-panel.active{
       display:block;
     }
+
     .layout{
       display:grid;
       grid-template-columns:2.1fr 1.3fr;
@@ -104,7 +125,11 @@
       .layout{
         grid-template-columns:1fr;
       }
+      .tabs{
+        flex-wrap:wrap;
+      }
     }
+
     .card{
       background:var(--bg-elevated);
       border-radius:var(--radius-lg);
@@ -124,6 +149,8 @@
       font-size:0.76rem;
       color:var(--text-muted);
     }
+
+    /* Servo cards */
     .servo-grid{
       display:grid;
       grid-template-columns:repeat(auto-fill,minmax(210px,1fr));
@@ -172,6 +199,8 @@
       background:#070915;
       color:var(--text);
     }
+
+    /* Buttons */
     .btn-mini{
       padding:3px 6px;
       border-radius:999px;
@@ -181,23 +210,18 @@
       background:var(--accent-soft);
       color:var(--text);
     }
-    .btn-mini:hover{
-      background:var(--accent);
-    }
+    .btn-mini:hover{ background:var(--accent); }
     .btn-mini.danger{
       background:var(--danger-soft);
       color:#ffd7e0;
     }
-    .btn-mini.danger:hover{
-      background:var(--danger);
-    }
+    .btn-mini.danger:hover{ background:var(--danger); }
     .btn-mini.secondary{
       background:#151827;
       color:var(--text-muted);
     }
-    .btn-mini.secondary:hover{
-      background:#22263a;
-    }
+    .btn-mini.secondary:hover{ background:#22263a; }
+
     .btn{
       border-radius:999px;
       border:none;
@@ -210,30 +234,23 @@
       align-items:center;
       gap:5px;
     }
-    .btn:hover{
-      background:var(--accent);
-    }
+    .btn:hover{ background:var(--accent); }
     .btn.secondary{
       background:#151827;
       color:var(--text-muted);
     }
-    .btn.secondary:hover{
-      background:#1d2132;
-    }
+    .btn.secondary:hover{ background:#1d2132; }
     .btn.danger{
       background:var(--danger-soft);
       color:#ffd7e0;
     }
-    .btn.danger:hover{
-      background:var(--danger);
-    }
+    .btn.danger:hover{ background:var(--danger); }
     .btn-save{
       background:var(--success-soft);
       color:#d7ffef;
     }
-    .btn-save:hover{
-      background:var(--success);
-    }
+    .btn-save:hover{ background:var(--success); }
+
     .row{
       display:flex;
       flex-wrap:wrap;
@@ -241,6 +258,7 @@
       margin-top:6px;
       align-items:center;
     }
+
     input[type="number"],
     input[type="text"],
     textarea,
@@ -276,28 +294,6 @@
       padding:1px 4px;
       border-radius:4px;
     }
-    .status-pill{
-      display:inline-flex;
-      align-items:center;
-      gap:4px;
-      padding:2px 7px;
-      border-radius:999px;
-      background:#151827;
-      font-size:0.75rem;
-      color:var(--text-muted);
-    }
-    .status-dot{
-      width:6px;
-      height:6px;
-      border-radius:50%;
-      background:#f5c04f;
-    }
-    .status-dot.ok{
-      background:#1dd389;
-    }
-    .status-dot.err{
-      background:#ff4b6a;
-    }
 
     /* File list */
     .file-list{
@@ -317,9 +313,7 @@
       gap:6px;
       align-items:center;
     }
-    .file-list-item:last-child{
-      border-bottom:none;
-    }
+    .file-list-item:last-child{ border-bottom:none; }
     .file-name{
       white-space:nowrap;
       overflow:hidden;
@@ -334,22 +328,18 @@
       background:#151826;
       color:var(--text-muted);
     }
-    .file-actions button:hover{
-      background:#22263a;
-    }
+    .file-actions button:hover{ background:#22263a; }
     .file-actions button.danger{
       background:var(--danger-soft);
       color:#ffd7e0;
     }
-    .file-actions button.danger:hover{
-      background:var(--danger);
-    }
+    .file-actions button.danger:hover{ background:var(--danger); }
     .file-list-item .meta{
       font-size:0.75rem;
       color:var(--text-muted);
     }
 
-    /* Remote ovladač */
+    /* Remote ovladač – dospělý */
     .remote-grid{
       display:grid;
       grid-template-columns:repeat(3,80px);
@@ -380,9 +370,8 @@
     .remote-center{
       background:var(--success-soft);
     }
-    .remote-center:hover{
-      background:var(--success);
-    }
+    .remote-center:hover{ background:var(--success); }
+
     .remote-table{
       width:100%;
       border-collapse:collapse;
@@ -399,14 +388,119 @@
       color:var(--text-muted);
       font-weight:normal;
     }
-    .remote-table select{
-      min-width:90px;
+    .remote-table select{ min-width:90px; }
+    .remote-seq-select{
+      width:100%;
+      margin-bottom:2px;
+    }
+    .remote-url-input{
+      width:100%;
+    }
+
+    /* Dětský režim – velká tlačítka s obrázky */
+    .kid-layout{
+      display:flex;
+      flex-direction:column;
+      gap:12px;
+    }
+    @media(min-width:900px){
+      .kid-layout{
+        flex-direction:row;
+      }
+    }
+    .kid-main,
+    .kid-extra{
+      flex:1;
+    }
+    .kid-section{
+      margin-top:0.4rem;
+    }
+    .kid-label{
+      font-size:0.8rem;
+      color:var(--text-muted);
+      margin-bottom:0.2rem;
+    }
+    .kid-grid{
+      display:grid;
+      grid-template-columns:repeat(3,100px);
+      grid-template-rows:repeat(3,100px);
+      gap:1rem;
+      justify-content:center;
+      margin:0.8rem 0 0.4rem;
+    }
+    .kid-btn{
+      width:100px;
+      height:100px;
+      border-radius:28px;
+      border:none;
+      cursor:pointer;
+      font-size:2.2rem;
+      background:var(--accent-soft);
+      color:var(--text);
+      box-shadow:0 10px 26px rgba(0,0,0,0.6);
+    }
+    .kid-btn:hover{
+      background:var(--accent);
+      transform:translateY(-1px);
+    }
+    .kid-btn:active{
+      transform:translateY(1px) scale(0.98);
+      box-shadow:0 4px 12px rgba(0,0,0,0.7);
+    }
+    .kid-btn-center{
+      background:var(--success-soft);
+    }
+    .kid-btn-center:hover{ background:var(--success); }
+
+    .kid-body-grid{
+      display:grid;
+      grid-template-columns:repeat(auto-fit,minmax(130px,1fr));
+      gap:0.8rem;
+      margin-top:0.6rem;
+    }
+    .kid-body-col{
+      text-align:center;
+    }
+    .kid-body-icon{
+      font-size:2rem;
+      margin-bottom:0.25rem;
+    }
+    .kid-body-arrows{
+      display:flex;
+      justify-content:center;
+      gap:0.4rem;
+    }
+    .kid-btn-small{
+      width:64px;
+      height:64px;
+      border-radius:20px;
+      border:none;
+      cursor:pointer;
+      font-size:1.6rem;
+      background:var(--accent-soft);
+      color:var(--text);
+      box-shadow:0 8px 22px rgba(0,0,0,0.6);
+    }
+    .kid-btn-small:hover{
+      background:var(--accent);
+      transform:translateY(-1px);
+    }
+    .kid-btn-small:active{
+      transform:translateY(1px) scale(0.98);
+      box-shadow:0 3px 10px rgba(0,0,0,0.7);
+    }
+    .kid-status{
+      margin-top:0.5rem;
+      padding:4px 8px;
+      border-radius:999px;
+      background:#151827;
+      font-size:0.75rem;
+      color:var(--text-muted);
+      text-align:center;
     }
 
     /* OTTO DIY robot – diagram */
-    .otto-card{
-      margin-top:0.8rem;
-    }
+    .otto-card{ margin-top:0.8rem; }
     .otto-diagram{
       display:grid;
       grid-template-columns:repeat(3,minmax(80px,1fr));
@@ -460,10 +554,16 @@
       justify-content:center;
       width:100%;
     }
-    .otto-seq-row input{
+    .otto-seq-row input,
+    .otto-seq-row select{
       flex:1;
       min-width:0;
       font-size:0.7rem;
+      background:#070915;
+      border-radius:999px;
+      border:1px solid rgba(255,255,255,0.1);
+      padding:3px 4px;
+      color:var(--text);
     }
     .otto-label-strong{
       font-weight:600;
@@ -475,25 +575,393 @@
 <main>
   <header>
     <div>
-      <div class="title">ESP32 Servo Tester 360°</div>
+      <div class="title">Otto ESP32 – Robot & Servo Tester 360°</div>
       <div class="subtitle">6× SG90 360° · webové UI · sekvence · OTA · LittleFS</div>
+      <div class="mode-badges">
+        <div class="mode-pill child">👦 Dětské ovládání – obrázky</div>
+        <div class="mode-pill">🛠 Režim dospělého – nastavení robota</div>
+      </div>
     </div>
     <div class="badge-ip" id="ipBadge">IP: zjistí se z prohlížeče</div>
   </header>
 
   <div class="tabs">
-    <button class="tab-btn active" data-tab="tab-control">Ovládání serv</button>
-    <button class="tab-btn" data-tab="tab-remote">Ovladač</button>
-    <button class="tab-btn" data-tab="tab-seq">Sekvence</button>
-    <button class="tab-btn" data-tab="tab-ota">OTA &amp; soubory</button>
+    <button class="tab-btn active" data-tab="tab-kid">👦 Dítě</button>
+    <button class="tab-btn" data-tab="tab-remote">🕹 Ovladač</button>
+    <button class="tab-btn" data-tab="tab-control">⚙ Serva</button>
+    <button class="tab-btn" data-tab="tab-seq">📜 Sekvence</button>
+    <button class="tab-btn" data-tab="tab-ota">⬆ OTA &amp; soubory</button>
   </div>
 
-  <!-- TAB 1: Ovládání serv -->
-  <div class="tab-panel active" id="tab-control">
+  <!-- TAB: Dětské ovládání -->
+  <div class="tab-panel active" id="tab-kid">
+    <div class="kid-layout">
+      <div class="kid-main">
+        <div class="card">
+          <h2>Ovládání pro děti</h2>
+          <p class="small">
+            Dítě mačká jen velká tlačítka se symboly. Co dělají, nastavíš v záložkách
+            <strong>Ovladač</strong> a <strong>Sekvence</strong>.
+          </p>
+
+          <div class="kid-section">
+            <div class="kid-label">Chůze robota (mapuje se v „Nastavení ovladače“)</div>
+            <div class="kid-grid">
+              <div></div>
+              <button class="kid-btn" onclick="kidRemoteFire(0)" title="dopředu">▲</button>
+              <div></div>
+
+              <button class="kid-btn" onclick="kidRemoteFire(2)" title="doleva">◀</button>
+              <button class="kid-btn kid-btn-center" onclick="kidRemoteFire(4)" title="otočka vlevo">↺</button>
+              <button class="kid-btn" onclick="kidRemoteFire(3)" title="doprava">▶</button>
+
+              <div></div>
+              <button class="kid-btn" onclick="kidRemoteFire(1)" title="dozadu">▼</button>
+              <button class="kid-btn" onclick="kidRemoteFire(5)" title="otočka vpravo">↻</button>
+            </div>
+          </div>
+
+          <div id="kidStatus" class="kid-status">Připraveno.</div>
+        </div>
+      </div>
+
+      <div class="kid-extra">
+        <div class="card">
+          <h2>Ruce, nohy a chodidla</h2>
+          <p class="small">
+            Tato tlačítka spouští sekvence z diagramu OTTO v záložce
+            <strong>Ovladač</strong>. Vybereš je tam z rozbalovacího seznamu.
+          </p>
+
+          <div class="kid-body-grid">
+            <div class="kid-body-col">
+              <div class="kid-body-icon">👋</div>
+              <div class="kid-label">L ruka</div>
+              <div class="kid-body-arrows">
+                <button class="kid-btn-small" onclick="kidOttoSeqFire('otto_seq_arm_left_up')" title="L ruka nahoru">▲</button>
+                <button class="kid-btn-small" onclick="kidOttoSeqFire('otto_seq_arm_left_down')" title="L ruka dolů">▼</button>
+              </div>
+            </div>
+
+            <div class="kid-body-col">
+              <div class="kid-body-icon">👋</div>
+              <div class="kid-label">P ruka</div>
+              <div class="kid-body-arrows">
+                <button class="kid-btn-small" onclick="kidOttoSeqFire('otto_seq_arm_right_up')" title="P ruka nahoru">▲</button>
+                <button class="kid-btn-small" onclick="kidOttoSeqFire('otto_seq_arm_right_down')" title="P ruka dolů">▼</button>
+              </div>
+            </div>
+
+            <div class="kid-body-col">
+              <div class="kid-body-icon">🦵</div>
+              <div class="kid-label">L stehno</div>
+              <div class="kid-body-arrows">
+                <button class="kid-btn-small" onclick="kidOttoSeqFire('otto_seq_thigh_left_left')" title="L stehno doleva">◀</button>
+                <button class="kid-btn-small" onclick="kidOttoSeqFire('otto_seq_thigh_left_right')" title="L stehno doprava">▶</button>
+              </div>
+            </div>
+
+            <div class="kid-body-col">
+              <div class="kid-body-icon">🦵</div>
+              <div class="kid-label">P stehno</div>
+              <div class="kid-body-arrows">
+                <button class="kid-btn-small" onclick="kidOttoSeqFire('otto_seq_thigh_right_left')" title="P stehno doleva">◀</button>
+                <button class="kid-btn-small" onclick="kidOttoSeqFire('otto_seq_thigh_right_right')" title="P stehno doprava">▶</button>
+              </div>
+            </div>
+
+            <div class="kid-body-col">
+              <div class="kid-body-icon">🦶</div>
+              <div class="kid-label">L chodidlo</div>
+              <div class="kid-body-arrows">
+                <button class="kid-btn-small" onclick="kidOttoSeqFire('otto_seq_foot_left_up')" title="L chodidlo nahoru">▲</button>
+                <button class="kid-btn-small" onclick="kidOttoSeqFire('otto_seq_foot_left_down')" title="L chodidlo dolů">▼</button>
+              </div>
+            </div>
+
+            <div class="kid-body-col">
+              <div class="kid-body-icon">🦶</div>
+              <div class="kid-label">P chodidlo</div>
+              <div class="kid-body-arrows">
+                <button class="kid-btn-small" onclick="kidOttoSeqFire('otto_seq_foot_right_up')" title="P chodidlo nahoru">▲</button>
+                <button class="kid-btn-small" onclick="kidOttoSeqFire('otto_seq_foot_right_down')" title="P chodidlo dolů">▼</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- TAB: Ovladač (dospělý) -->
+  <div class="tab-panel" id="tab-remote">
+    <div class="card">
+      <h2>Dálkové ovládání robota</h2>
+      <p class="small">
+        Šipky spouštějí přednastavené sekvence nebo vlastní příkazy.  
+        Dítě v záložce <strong>Dítě</strong> používá stejné mapování, ale jen obrázky.
+      </p>
+
+      <div class="remote-grid">
+        <div></div>
+        <button class="remote-btn" onclick="remoteFire(0)" title="Dopředu (▲)">▲</button>
+        <div></div>
+
+        <button class="remote-btn" onclick="remoteFire(2)" title="Vlevo (◀)">◀</button>
+        <button class="remote-btn remote-center" onclick="remoteFire(4)" title="Otočka vlevo ↺">↺</button>
+        <button class="remote-btn" onclick="remoteFire(3)" title="Vpravo (▶)">▶</button>
+
+        <div></div>
+        <button class="remote-btn" onclick="remoteFire(1)" title="Dozadu (▼)">▼</button>
+        <button class="remote-btn" onclick="remoteFire(5)" title="Otočka vpravo ↻">↻</button>
+      </div>
+
+      <p class="small" id="remoteStatus">Připraveno.</p>
+
+      <hr style="border-color:rgba(255,255,255,0.04);margin:0.7rem 0;">
+
+      <h3 style="margin-top:0;">Nastavení ovladače</h3>
+      <p class="small">
+        Ke každému tlačítku můžeš přiřadit:
+        <ul class="small">
+          <li><strong>sekvenci</strong> – vybírá se z uložených sekvencí,</li>
+          <li><strong>URL příkaz</strong> – vlastní API volání (např. <code>/api/move_angle?...</code>),</li>
+          <li><strong>vypnuto</strong> – tlačítko nic nedělá.</li>
+        </ul>
+      </p>
+
+      <table class="remote-table">
+        <thead>
+        <tr>
+          <th>Tlačítko</th>
+          <th>Akce</th>
+          <th>Sekvence / URL</th>
+        </tr>
+        </thead>
+        <tbody>
+        <tr>
+          <td>Dopředu (▲)</td>
+          <td>
+            <select id="remote_type_0" onchange="remoteChanged(0)">
+              <option value="none">vypnuto</option>
+              <option value="seq">sekvence</option>
+              <option value="url">URL příkaz</option>
+            </select>
+          </td>
+          <td>
+            <select id="remote_seq_0" class="remote-seq-select" onchange="remoteChanged(0)"></select>
+            <input id="remote_url_0" class="remote-url-input" placeholder="/api/..." onchange="remoteChanged(0)" style="display:none;">
+          </td>
+        </tr>
+        <tr>
+          <td>Dozadu (▼)</td>
+          <td>
+            <select id="remote_type_1" onchange="remoteChanged(1)">
+              <option value="none">vypnuto</option>
+              <option value="seq">sekvence</option>
+              <option value="url">URL příkaz</option>
+            </select>
+          </td>
+          <td>
+            <select id="remote_seq_1" class="remote-seq-select" onchange="remoteChanged(1)"></select>
+            <input id="remote_url_1" class="remote-url-input" placeholder="/api/..." onchange="remoteChanged(1)" style="display:none;">
+          </td>
+        </tr>
+        <tr>
+          <td>Doleva (◀)</td>
+          <td>
+            <select id="remote_type_2" onchange="remoteChanged(2)">
+              <option value="none">vypnuto</option>
+              <option value="seq">sekvence</option>
+              <option value="url">URL příkaz</option>
+            </select>
+          </td>
+          <td>
+            <select id="remote_seq_2" class="remote-seq-select" onchange="remoteChanged(2)"></select>
+            <input id="remote_url_2" class="remote-url-input" placeholder="/api/..." onchange="remoteChanged(2)" style="display:none;">
+          </td>
+        </tr>
+        <tr>
+          <td>Doprava (▶)</td>
+          <td>
+            <select id="remote_type_3" onchange="remoteChanged(3)">
+              <option value="none">vypnuto</option>
+              <option value="seq">sekvence</option>
+              <option value="url">URL příkaz</option>
+            </select>
+          </td>
+          <td>
+            <select id="remote_seq_3" class="remote-seq-select" onchange="remoteChanged(3)"></select>
+            <input id="remote_url_3" class="remote-url-input" placeholder="/api/..." onchange="remoteChanged(3)" style="display:none;">
+          </td>
+        </tr>
+        <tr>
+          <td>Otočka vlevo (↺)</td>
+          <td>
+            <select id="remote_type_4" onchange="remoteChanged(4)">
+              <option value="none">vypnuto</option>
+              <option value="seq">sekvence</option>
+              <option value="url">URL příkaz</option>
+            </select>
+          </td>
+          <td>
+            <select id="remote_seq_4" class="remote-seq-select" onchange="remoteChanged(4)"></select>
+            <input id="remote_url_4" class="remote-url-input" placeholder="/api/..." onchange="remoteChanged(4)" style="display:none;">
+          </td>
+        </tr>
+        <tr>
+          <td>Otočka vpravo (↻)</td>
+          <td>
+            <select id="remote_type_5" onchange="remoteChanged(5)">
+              <option value="none">vypnuto</option>
+              <option value="seq">sekvence</option>
+              <option value="url">URL příkaz</option>
+            </select>
+          </td>
+          <td>
+            <select id="remote_seq_5" class="remote-seq-select" onchange="remoteChanged(5)"></select>
+            <input id="remote_url_5" class="remote-url-input" placeholder="/api/..." onchange="remoteChanged(5)" style="display:none;">
+          </td>
+        </tr>
+        </tbody>
+      </table>
+
+      <div class="row" style="margin-top:0.6rem;">
+        <button class="btn-save" onclick="saveRemoteConfig()">💾 Uložit nastavení ovladače</button>
+      </div>
+    </div>
+
+    <!-- OTTO DIY ROBOT – vizuální diagram s přiřazením sekvencí -->
+    <div class="card otto-card">
+      <h3>OTTO DIY robot – diagram pohybů</h3>
+      <p class="small">
+        Každému směru pohybu (nahoru/dolů nebo doleva/doprava) můžeš přiřadit sekvenci
+        (název bez <code>seq_</code>). Vybírá se z uložených sekvencí v seznamu níže.
+        Diagram se ukládá do prohlížeče a používá ho i záložka <strong>Dítě</strong>.
+      </p>
+
+      <div class="otto-diagram">
+        <!-- řádek hlavy -->
+        <div></div>
+        <div class="otto-part">
+          <div class="otto-shape otto-head"></div>
+          <div>hlava</div>
+        </div>
+        <div></div>
+
+        <!-- řádek ruce + tělo -->
+        <div class="otto-part">
+          <div class="otto-label-strong">L ruka</div>
+          <div class="otto-seq">
+            <div class="otto-seq-row">
+              <button class="btn-mini" title="L ruka nahoru" onclick="ottoSeqFire('otto_seq_arm_left_up')">▲</button>
+              <select id="otto_seq_arm_left_up"></select>
+            </div>
+            <div class="otto-seq-row">
+              <button class="btn-mini" title="L ruka dolů" onclick="ottoSeqFire('otto_seq_arm_left_down')">▼</button>
+              <select id="otto_seq_arm_left_down"></select>
+            </div>
+          </div>
+        </div>
+        <div class="otto-part">
+          <div class="otto-shape otto-body"></div>
+          <div>tělo</div>
+        </div>
+        <div class="otto-part">
+          <div class="otto-label-strong">P ruka</div>
+          <div class="otto-seq">
+            <div class="otto-seq-row">
+              <button class="btn-mini" title="P ruka nahoru" onclick="ottoSeqFire('otto_seq_arm_right_up')">▲</button>
+              <select id="otto_seq_arm_right_up"></select>
+            </div>
+            <div class="otto-seq-row">
+              <button class="btn-mini" title="P ruka dolů" onclick="ottoSeqFire('otto_seq_arm_right_down')">▼</button>
+              <select id="otto_seq_arm_right_down"></select>
+            </div>
+          </div>
+        </div>
+
+        <!-- řádek nohy -->
+        <div class="otto-part">
+          <div class="otto-shape otto-leg"></div>
+          <div class="otto-label-strong">L noha</div>
+          <div class="otto-seq">
+            <div class="otto-seq-row">
+              <button class="btn-mini" title="L stehno doleva" onclick="ottoSeqFire('otto_seq_thigh_left_left')">◀</button>
+              <select id="otto_seq_thigh_left_left"></select>
+            </div>
+            <div class="otto-seq-row">
+              <button class="btn-mini" title="L stehno doprava" onclick="ottoSeqFire('otto_seq_thigh_left_right')">▶</button>
+              <select id="otto_seq_thigh_left_right"></select>
+            </div>
+          </div>
+        </div>
+        <div class="otto-part">
+          <div></div>
+        </div>
+        <div class="otto-part">
+          <div class="otto-shape otto-leg"></div>
+          <div class="otto-label-strong">P noha</div>
+          <div class="otto-seq">
+            <div class="otto-seq-row">
+              <button class="btn-mini" title="P stehno doleva" onclick="ottoSeqFire('otto_seq_thigh_right_left')">◀</button>
+              <select id="otto_seq_thigh_right_left"></select>
+            </div>
+            <div class="otto-seq-row">
+              <button class="btn-mini" title="P stehno doprava" onclick="ottoSeqFire('otto_seq_thigh_right_right')">▶</button>
+              <select id="otto_seq_thigh_right_right"></select>
+            </div>
+          </div>
+        </div>
+
+        <!-- řádek chodidla -->
+        <div class="otto-part">
+          <div class="otto-shape otto-foot"></div>
+          <div class="otto-label-strong">L chodidlo</div>
+          <div class="otto-seq">
+            <div class="otto-seq-row">
+              <button class="btn-mini" title="L chodidlo nahoru" onclick="ottoSeqFire('otto_seq_foot_left_up')">▲</button>
+              <select id="otto_seq_foot_left_up"></select>
+            </div>
+            <div class="otto-seq-row">
+              <button class="btn-mini" title="L chodidlo dolů" onclick="ottoSeqFire('otto_seq_foot_left_down')">▼</button>
+              <select id="otto_seq_foot_left_down"></select>
+            </div>
+          </div>
+        </div>
+        <div></div>
+        <div class="otto-part">
+          <div class="otto-shape otto-foot"></div>
+          <div class="otto-label-strong">P chodidlo</div>
+          <div class="otto-seq">
+            <div class="otto-seq-row">
+              <button class="btn-mini" title="P chodidlo nahoru" onclick="ottoSeqFire('otto_seq_foot_right_up')">▲</button>
+              <select id="otto_seq_foot_right_up"></select>
+            </div>
+            <div class="otto-seq-row">
+              <button class="btn-mini" title="P chodidlo dolů" onclick="ottoSeqFire('otto_seq_foot_right_down')">▼</button>
+              <select id="otto_seq_foot_right_down"></select>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <p class="small" style="margin-top:0.6rem;">
+        Tip: sekvence může ovládat i více serv zároveň (např. chůze vpřed pracuje s oběma nohama).
+        Diagram je jen vizuální pomůcka, aby bylo dítěti jasné, co se má hýbat.
+      </p>
+    </div>
+  </div>
+
+  <!-- TAB: Serva -->
+  <div class="tab-panel" id="tab-control">
     <div class="layout">
       <div class="card">
         <h2>Serva</h2>
-        <p class="small">Nastav popisy, přiřaď GPIO a testuj směrem vlevo/vpravo. Impulz trvá přednastavený čas (PULSE&nbsp;ms).</p>
+        <p class="small">
+          Nastav popisy, přiřaď GPIO a testuj směrem vlevo/vpravo.  
+          Impulz trvá přednastavený čas (PULSE&nbsp;ms).
+        </p>
         <div id="servoCards" class="servo-grid"></div>
       </div>
 
@@ -526,248 +994,7 @@
     </div>
   </div>
 
-  <!-- TAB 2: Ovladač -->
-  <div class="tab-panel" id="tab-remote">
-    <div class="card">
-      <h2>Dálkové ovládání robota</h2>
-      <p class="small">
-        Šipky spouštějí přednastavené sekvence nebo vlastní příkazy.  
-        Dítě používá jen tento ovladač, nastavení níže je pro dospělého.
-      </p>
-
-      <div class="remote-grid">
-        <div></div>
-        <button class="remote-btn" onclick="remoteFire(0)" title="Dopředu (▲)">▲</button>
-        <div></div>
-
-        <button class="remote-btn" onclick="remoteFire(2)" title="Vlevo (◀)">◀</button>
-        <button class="remote-btn remote-center" onclick="remoteFire(4)" title="Otočka vlevo ↺">↺</button>
-        <button class="remote-btn" onclick="remoteFire(3)" title="Vpravo (▶)">▶</button>
-
-        <div></div>
-        <button class="remote-btn" onclick="remoteFire(1)" title="Dozadu (▼)">▼</button>
-        <button class="remote-btn" onclick="remoteFire(5)" title="Otočka vpravo ↻">↻</button>
-      </div>
-
-      <p class="small" id="remoteStatus"></p>
-
-      <hr style="border-color:rgba(255,255,255,0.04);margin:0.7rem 0;">
-
-      <h3 style="margin-top:0;">Nastavení ovladače</h3>
-      <p class="small">
-        Ke každému tlačítku přiřaď sekvenci (název bez prefixu
-        <code>seq_</code>) nebo vlastní URL příkazu (např.
-        <code>/api/move_angle?servo=2&amp;angle=45&amp;power=40</code>).
-      </p>
-
-      <!-- Seznam dostupných sekvencí pro našeptávání v polích "Sekvence / URL" -->
-      <datalist id="remoteSeqList"></datalist>
-
-      <table class="remote-table">
-        <thead>
-        <tr>
-          <th>Tlačítko</th>
-          <th>Akce</th>
-          <th>Sekvence / URL</th>
-        </tr>
-        </thead>
-        <tbody>
-        <tr>
-          <td>Dopředu (▲)</td>
-          <td>
-            <select id="remote_type_0" onchange="remoteChanged(0)">
-              <option value="none">vypnuto</option>
-              <option value="seq">sekvence</option>
-              <option value="url">URL příkaz</option>
-            </select>
-          </td>
-          <td><input id="remote_value_0" list="remoteSeqList" placeholder="např. chuze_vpred" onchange="remoteChanged(0)"></td>
-        </tr>
-        <tr>
-          <td>Dozadu (▼)</td>
-          <td>
-            <select id="remote_type_1" onchange="remoteChanged(1)">
-              <option value="none">vypnuto</option>
-              <option value="seq">sekvence</option>
-              <option value="url">URL příkaz</option>
-            </select>
-          </td>
-          <td><input id="remote_value_1" list="remoteSeqList" placeholder="např. chuze_zpet" onchange="remoteChanged(1)"></td>
-        </tr>
-        <tr>
-          <td>Doleva (◀)</td>
-          <td>
-            <select id="remote_type_2" onchange="remoteChanged(2)">
-              <option value="none">vypnuto</option>
-              <option value="seq">sekvence</option>
-              <option value="url">URL příkaz</option>
-            </select>
-          </td>
-          <td><input id="remote_value_2" list="remoteSeqList" placeholder="např. zatoc_vlevo" onchange="remoteChanged(2)"></td>
-        </tr>
-        <tr>
-          <td>Doprava (▶)</td>
-          <td>
-            <select id="remote_type_3" onchange="remoteChanged(3)">
-              <option value="none">vypnuto</option>
-              <option value="seq">sekvence</option>
-              <option value="url">URL příkaz</option>
-            </select>
-          </td>
-          <td><input id="remote_value_3" list="remoteSeqList" placeholder="např. zatoc_vpravo" onchange="remoteChanged(3)"></td>
-        </tr>
-        <tr>
-          <td>Otočka vlevo (↺)</td>
-          <td>
-            <select id="remote_type_4" onchange="remoteChanged(4)">
-              <option value="none">vypnuto</option>
-              <option value="seq">sekvence</option>
-              <option value="url">URL příkaz</option>
-            </select>
-          </td>
-          <td><input id="remote_value_4" list="remoteSeqList" placeholder="např. otocka_vlevo" onchange="remoteChanged(4)"></td>
-        </tr>
-        <tr>
-          <td>Otočka vpravo (↻)</td>
-          <td>
-            <select id="remote_type_5" onchange="remoteChanged(5)">
-              <option value="none">vypnuto</option>
-              <option value="seq">sekvence</option>
-              <option value="url">URL příkaz</option>
-            </select>
-          </td>
-          <td><input id="remote_value_5" list="remoteSeqList" placeholder="např. otocka_vpravo" onchange="remoteChanged(5)"></td>
-        </tr>
-        </tbody>
-      </table>
-
-      <div class="row" style="margin-top:0.6rem;">
-        <button class="btn-save" onclick="saveRemoteConfig()">💾 Uložit nastavení ovladače</button>
-      </div>
-    </div>
-
-    <!-- OTTO DIY ROBOT – vizuální diagram s přiřazením sekvencí -->
-    <div class="card otto-card">
-      <h3>OTTO DIY robot – diagram pohybů</h3>
-      <p class="small">
-        Každému směru pohybu (nahoru/dolů nebo doleva/doprava) můžeš přiřadit sekvenci
-        (název bez <code>seq_</code>). Například <code>l_ruka_up</code>, <code>l_ruka_down</code> atd.
-      </p>
-
-      <div class="otto-diagram">
-        <!-- řádek hlavy -->
-        <div></div>
-        <div class="otto-part">
-          <div class="otto-shape otto-head"></div>
-          <div>hlava</div>
-        </div>
-        <div></div>
-
-        <!-- řádek ruce + tělo -->
-        <div class="otto-part">
-          <div class="otto-label-strong">L ruka</div>
-          <div class="otto-seq">
-            <div class="otto-seq-row">
-              +              <button class="btn-mini" title="L ruka nahoru" onclick="ottoSeqFire('otto_seq_arm_left_up')">▲</button>
-              <input id="otto_seq_arm_left_up" list="remoteSeqList" placeholder="L ruka nahoru">
-            </div>
-            <div class="otto-seq-row">
-              <button class="btn-mini" title="L ruka dolů" onclick="ottoSeqFire('otto_seq_arm_left_down')">▼</button>
-              <input id="otto_seq_arm_left_down" list="remoteSeqList" placeholder="L ruka dolů">
-            </div>
-          </div>
-        </div>
-        <div class="otto-part">
-          <div class="otto-shape otto-body"></div>
-          <div>tělo</div>
-        </div>
-        <div class="otto-part">
-          <div class="otto-label-strong">P ruka</div>
-          <div class="otto-seq">
-            <div class="otto-seq-row">
-              <button class="btn-mini" title="P ruka nahoru" onclick="ottoSeqFire('otto_seq_arm_right_up')">▲</button>
-              <input id="otto_seq_arm_right_up" list="remoteSeqList" placeholder="P ruka nahoru">
-            </div>
-            <div class="otto-seq-row">
-              <button class="btn-mini" title="P ruka dolů" onclick="ottoSeqFire('otto_seq_arm_right_down')">▼</button>
-              <input id="otto_seq_arm_right_down" list="remoteSeqList" placeholder="P ruka dolů">
-            </div>
-          </div>
-        </div>
-
-        <!-- řádek nohy -->
-        <div class="otto-part">
-          <div class="otto-shape otto-leg"></div>
-          <div class="otto-label-strong">L noha</div>
-          <div class="otto-seq">
-            <div class="otto-seq-row">
-              <button class="btn-mini" title="L stehno doleva" onclick="ottoSeqFire('otto_seq_thigh_left_left')">◀</button>
-              <input id="otto_seq_thigh_left_left" list="remoteSeqList" placeholder="L stehno doleva">
-            </div>
-            <div class="otto-seq-row">
-              <button class="btn-mini" title="L stehno doprava" onclick="ottoSeqFire('otto_seq_thigh_left_right')">▶</button>
-              <input id="otto_seq_thigh_left_right" list="remoteSeqList" placeholder="L stehno doprava">
-             </div>
-          </div>
-        </div>
-        <div class="otto-part">
-          <div></div>
-        </div>
-        <div class="otto-part">
-          <div class="otto-shape otto-leg"></div>
-          <div class="otto-label-strong">P noha</div>
-          <div class="otto-seq">
-            <div class="otto-seq-row">
-              <button class="btn-mini" title="P stehno doleva" onclick="ottoSeqFire('otto_seq_thigh_right_left')">◀</button>
-              <input id="otto_seq_thigh_right_left" list="remoteSeqList" placeholder="P stehno doleva">
-            </div>
-            <div class="otto-seq-row">
-              <button class="btn-mini" title="P stehno doprava" onclick="ottoSeqFire('otto_seq_thigh_right_right')">▶</button>
-              <input id="otto_seq_thigh_right_right" list="remoteSeqList" placeholder="P stehno doprava">
-            </div>
-          </div>
-        </div>
-
-        <!-- řádek chodidla -->
-        <div class="otto-part">
-          <div class="otto-shape otto-foot"></div>
-          <div class="otto-label-strong">L chodidlo</div>
-          <div class="otto-seq">
-            <div class="otto-seq-row">
-              <button class="btn-mini" title="L chodidlo nahoru" onclick="ottoSeqFire('otto_seq_foot_left_up')">▲</button>
-              <input id="otto_seq_foot_left_up" list="remoteSeqList" placeholder="L chodidlo nahoru">
-            </div>
-            <div class="otto-seq-row">
-              <button class="btn-mini" title="L chodidlo dolů" onclick="ottoSeqFire('otto_seq_foot_left_down')">▼</button>
-              <input id="otto_seq_foot_left_down" list="remoteSeqList" placeholder="L chodidlo dolů">
-            </div>
-          </div>
-        </div>
-        <div></div>
-        <div class="otto-part">
-          <div class="otto-shape otto-foot"></div>
-          <div class="otto-label-strong">P chodidlo</div>
-          <div class="otto-seq">
-            <div class="otto-seq-row">
-              <button class="btn-mini" title="P chodidlo nahoru" onclick="ottoSeqFire('otto_seq_foot_right_up')">▲</button>
-              <input id="otto_seq_foot_right_up" list="remoteSeqList" placeholder="P chodidlo nahoru">
-            </div>
-            <div class="otto-seq-row">
-              <button class="btn-mini" title="P chodidlo dolů" onclick="ottoSeqFire('otto_seq_foot_right_down')">▼</button>
-              <input id="otto_seq_foot_right_down" list="remoteSeqList" placeholder="P chodidlo dolů">
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <p class="small" style="margin-top:0.6rem;">
-        Tip: sekvence může ovládat i více serv zároveň (např. chůze vpřed pracuje s oběma nohama).
-        Diagram je jen vizuální pomůcka, aby bylo dítěti jasné, co se má hýbat.
-      </p>
-    </div>
-  </div>
-
-  <!-- TAB 3: Sekvence -->
+  <!-- TAB: Sekvence -->
   <div class="tab-panel" id="tab-seq">
     <div class="layout">
       <div class="card">
@@ -807,7 +1034,7 @@
     </div>
   </div>
 
-  <!-- TAB 4: OTA & soubory -->
+  <!-- TAB: OTA & soubory -->
   <div class="tab-panel" id="tab-ota">
     <div class="layout">
       <div class="card">
@@ -850,6 +1077,20 @@
 <script>
   const SERVO_COUNT = 6;
   const REMOTE_BTN_COUNT = 6;
+  const OTTO_INPUT_IDS = [
+    'otto_seq_arm_left_up',
+    'otto_seq_arm_left_down',
+    'otto_seq_arm_right_up',
+    'otto_seq_arm_right_down',
+    'otto_seq_thigh_left_left',
+    'otto_seq_thigh_left_right',
+    'otto_seq_thigh_right_left',
+    'otto_seq_thigh_right_right',
+    'otto_seq_foot_left_up',
+    'otto_seq_foot_left_down',
+    'otto_seq_foot_right_up',
+    'otto_seq_foot_right_down'
+  ];
 
   const gpioOptions = [
     2, 4, 5,
@@ -870,6 +1111,9 @@
 
   let remoteCfg = Array.from({length: REMOTE_BTN_COUNT},
     () => ({type:'none', value:''}));
+
+  // seznam názvů sekvencí (bez "seq_")
+  let seqNames = [];
 
   // UI-only přepínač směru pro jednotlivá serva (swap)
   let servoSwap = Array.from({length: SERVO_COUNT}, () => false);
@@ -907,21 +1151,46 @@
     saveServoSwapToStorage();
   }
 
-  // ----- Seznam sekvencí pro našeptávání v remote tabulce -----
-  function refreshRemoteSeqSuggestions(){
-    fetch('/api/seq_list')
-      .then(r=>r.json())
-      .then(data=>{
-        const dl = document.getElementById('remoteSeqList');
-        if (!dl) return;
-        dl.innerHTML = '';
-        (data.seq || []).forEach(name=>{
-          const opt = document.createElement('option');
-          opt.value = name;
-          dl.appendChild(opt);
-        });
-      })
-      .catch(console.error);
+  // ----- OTTO diagram – uložení nastavení v prohlížeči (pro dětský režim) -----
+  function loadOttoDiagramConfigFromStorage(){
+    try{
+      const raw = localStorage.getItem('otto_diagram_cfg');
+      if (!raw) return;
+      const obj = JSON.parse(raw);
+      if (!obj || typeof obj !== 'object') return;
+      OTTO_INPUT_IDS.forEach(id=>{
+        const el = document.getElementById(id);
+        if (el && typeof obj[id] === 'string'){
+          el.value = obj[id];
+        }
+      });
+    }catch(e){
+      console.error(e);
+    }
+  }
+
+  function saveOttoDiagramConfigToStorage(){
+    try{
+      const obj = {};
+      OTTO_INPUT_IDS.forEach(id=>{
+        const el = document.getElementById(id);
+        if (el && el.value){
+          obj[id] = el.value;
+        }
+      });
+      localStorage.setItem('otto_diagram_cfg', JSON.stringify(obj));
+    }catch(e){
+      console.error(e);
+    }
+  }
+
+  function initOttoDiagramBindings(){
+    OTTO_INPUT_IDS.forEach(id=>{
+      const el = document.getElementById(id);
+      if (el){
+        el.addEventListener('change', saveOttoDiagramConfigToStorage);
+      }
+    });
   }
 
   // ----- Tabs -----
@@ -933,12 +1202,14 @@
         document.querySelectorAll('.tab-panel').forEach(p=>p.classList.remove('active'));
         btn.classList.add('active');
         document.getElementById(tabId).classList.add('active');
+
         if (tabId === 'tab-seq') {
           loadSeqList();
         } else if (tabId === 'tab-remote') {
           updateSeqServoLegend();
           updateRemoteSettingsUI();
-	  refreshRemoteSeqSuggestions();
+        } else if (tabId === 'tab-kid') {
+          updateSeqServoLegend();
         }
       });
     });
@@ -970,7 +1241,7 @@
         </div>
         <div class="servo-row">
           <button class="btn-mini secondary" id="servo_swap_${i}" onclick="toggleServoSwap(${i})">Swap směr: OFF</button>
-         </div>
+        </div>
       `;
       container.appendChild(card);
     }
@@ -1107,18 +1378,103 @@
   }
 
   // ----- Sekvence -----
+  function refreshAllSeqSelectors(){
+    const names = seqNames || [];
+
+    // Remote ovladač – dropdowny
+    for (let i=0;i<REMOTE_BTN_COUNT;i++){
+      const sel = document.getElementById(`remote_seq_${i}`);
+      if (!sel) continue;
+      const current = sel.value;
+      sel.innerHTML = '';
+      const emptyOpt = document.createElement('option');
+      emptyOpt.value = '';
+      emptyOpt.textContent = '(žádná)';
+      sel.appendChild(emptyOpt);
+      names.forEach(n=>{
+        const opt = document.createElement('option');
+        opt.value = n;
+        opt.textContent = n;
+        sel.appendChild(opt);
+      });
+      if (current && names.includes(current)){
+        sel.value = current;
+      }
+    }
+
+    // OTTO diagram – dropdowny
+    OTTO_INPUT_IDS.forEach(id=>{
+      const sel = document.getElementById(id);
+      if (!sel) return;
+      const current = sel.value;
+      sel.innerHTML = '';
+      const emptyOpt = document.createElement('option');
+      emptyOpt.value = '';
+      emptyOpt.textContent = '(žádná)';
+      sel.appendChild(emptyOpt);
+      names.forEach(n=>{
+        const opt = document.createElement('option');
+        opt.value = n;
+        opt.textContent = n;
+        sel.appendChild(opt);
+      });
+      if (current && names.includes(current)){
+        sel.value = current;
+      }
+    });
+  }
+
+  // Načtení seznamu sekvencí z LittleFS přes /api/fs_list (filtrováno na /seq_*.txt)
   function loadSeqList(){
-    fetch('/api/seq_list')
+    fetch('/api/fs_list')
       .then(r=>r.json())
       .then(data=>{
+        const files = (data.files || []);
+        const names = [];
+
+        files.forEach(f=>{
+          let n = f.name || '';
+          if (!n) return;
+          // odřízni případnou cestu
+          const slash = n.lastIndexOf('/');
+          if (slash >= 0) n = n.substring(slash + 1);
+          // čekáme soubory typu seq_<name>.txt
+          if (!n.startsWith('seq_') || !n.endsWith('.txt')) return;
+          const base = n.substring(4, n.length - 4);
+          if (base && !names.includes(base)) names.push(base);
+        });
+
+        seqNames = names;
+
         const sel = document.getElementById('seqSelect');
+        const editor = document.getElementById('seqEditor');
+        const previous = sel.value;
+
         sel.innerHTML = '';
-        (data.seq || []).forEach(name=>{
+        seqNames.forEach(name=>{
           const opt = document.createElement('option');
           opt.value = name;
           opt.textContent = name;
           sel.appendChild(opt);
         });
+
+        if (seqNames.length){
+          if (previous && seqNames.includes(previous)){
+            sel.value = previous;
+          }else{
+            sel.value = seqNames[0];
+          }
+          loadSelectedSeq();
+        }else{
+          if (editor) editor.value = '';
+        }
+
+        // update všech dropdownů (remote + OTTO)
+        refreshAllSeqSelectors();
+        // po přepočtu dropdownů znovu natáhneme stav remoteCfg
+        updateRemoteSettingsUI();
+        // a konfiguraci OTTO z localStorage (při prvním načtení)
+        loadOttoDiagramConfigFromStorage();
       })
       .catch(console.error);
   }
@@ -1127,7 +1483,8 @@
     const sel = document.getElementById('seqSelect');
     const name = sel.value;
     if (!name) return;
-    fetch(`/api/seq_get?name=${encodeURIComponent(name)}`)
+    const path = `/seq_${name}.txt`;
+    fetch(`/api/fs_get?path=${encodeURIComponent(path)}`)
       .then(r=>r.text())
       .then(t=>{ document.getElementById('seqEditor').value = t; })
       .catch(console.error);
@@ -1150,12 +1507,16 @@
     const name = sel.value;
     if (!name){ alert('Vyber nebo vytvoř sekvenci.'); return; }
     const body = document.getElementById('seqEditor').value || '';
-    fetch(`/api/seq_save?name=${encodeURIComponent(name)}`,{
+    const path = `/seq_${name}.txt`;
+    fetch(`/api/fs_put?path=${encodeURIComponent(path)}`,{
       method:'POST',
       headers:{'Content-Type':'text/plain'},
       body
     }).then(r=>r.text())
-      .then(alert)
+      .then(t=>{
+        alert(t);
+        loadSeqList(); // aktualizuj seznam a dropdowny po uložení
+      })
       .catch(console.error);
   }
 
@@ -1164,158 +1525,311 @@
     const name = sel.value;
     if (!name) return;
     if (!confirm(`Smazat sekvenci "${name}"?`)) return;
-    fetch(`/api/seq_delete?name=${encodeURIComponent(name)}`)
+    const path = `/seq_${name}.txt`;
+    fetch(`/api/fs_delete?path=${encodeURIComponent(path)}`)
       .then(r=>r.text())
-      .then(alert)
-      .then(()=>loadSeqList())
+      .then(t=>{
+        alert(t);
+        loadSeqList(); // po smazání aktualizuj seznam a dropdowny
+      })
       .catch(console.error);
   }
 
+  // Lokální interpret sekvence – provádí řádky přes /api/move a /api/stop_one
+  function scheduleLocalSequence(text){
+    const lines = (text || '').split(/\r?\n/);
+    const steps = [];
+
+    lines.forEach(line=>{
+      const raw = line.trim();
+      if (!raw || raw.startsWith('#')) return;
+      const parts = raw.split(',');
+      if (parts.length < 3) return;
+
+      const servo = parseInt(parts[0],10);
+      const power = parseInt(parts[1],10);
+      const dur   = parseInt(parts[2],10);
+      if (isNaN(servo) || isNaN(power) || isNaN(dur)) return;
+      if (servo < 0 || servo >= SERVO_COUNT) return;
+
+      const duration = Math.max(0, dur);
+      const absPower = Math.min(100, Math.max(1, Math.abs(power)));
+      const dir = power >= 0 ? 1 : -1;
+
+      steps.push({servo, dir, absPower, duration});
+    });
+
+    if (!steps.length){
+      alert('V sekvenci nejsou žádné platné kroky.');
+      return;
+    }
+
+    let t = 0;
+    steps.forEach(step=>{
+      setTimeout(()=>{
+        fetch(`/api/move?servo=${step.servo}&dir=${step.dir}&step=${step.absPower}`)
+          .catch(console.error);
+        if (step.duration > 0){
+          setTimeout(()=>{
+            fetch(`/api/stop_one?servo=${step.servo}`).catch(console.error);
+          }, step.duration);
+        }
+      }, t);
+      t += step.duration;
+    });
+
+    alert(`Sekvence spuštěna, kroků: ${steps.length}`);
+  }
+
+  // Načte sekvenci podle názvu z LittleFS a spustí ji přes scheduleLocalSequence
+  function runNamedSequence(name, statusId, silentOnError){
+    const statusEl = statusId ? document.getElementById(statusId) : null;
+    const seqName = (name || '').trim();
+    if (!seqName){
+      if (statusEl) statusEl.textContent = 'Chybí název sekvence.';
+      if (!silentOnError) alert('Chybí název sekvence.');
+      return;
+    }
+
+    const path = `/seq_${seqName}.txt`;
+    if (statusEl) statusEl.textContent = 'Načítám sekvenci...';
+
+    fetch(`/api/fs_get?path=${encodeURIComponent(path)}`)
+      .then(r=>{
+        if (!r.ok) throw new Error('HTTP '+r.status);
+        return r.text();
+      })
+      .then(text=>{
+        if (statusEl) statusEl.textContent = 'Spouštím sekvenci...';
+        scheduleLocalSequence(text);
+      })
+      .catch(e=>{
+        console.error(e);
+        if (statusEl) statusEl.textContent = 'Sekvence nenalezena nebo chyba při načítání.';
+        if (!silentOnError) alert('Sekvence nebyla nalezena nebo došlo k chybě při načítání.');
+      });
+  }
+
   function runSeq(){
-    const sel = document.getElementById('seqSelect');
-    const name = sel.value;
-    if (!name){ alert('Vyber sekvenci.'); return; }
-    fetch(`/api/seq_run?name=${encodeURIComponent(name)}`)
-      .then(r=>r.text())
-      .then(alert)
-      .catch(console.error);
+    const text = document.getElementById('seqEditor').value || '';
+    if (!text.trim()){
+      alert('Sekvence je prázdná.');
+      return;
+    }
+    scheduleLocalSequence(text);
   }
 
   // ===== Remote ovladač (frontend) =====
   function updateRemoteSettingsUI(){
     for (let i=0;i<REMOTE_BTN_COUNT;i++){
       const cfg = remoteCfg[i] || {type:'none', value:''};
-      const sel = document.getElementById(`remote_type_${i}`);
-      const inp = document.getElementById(`remote_value_${i}`);
-      if (sel) sel.value = cfg.type || 'none';
-      if (inp) inp.value = cfg.value || '';
+      const selType = document.getElementById(`remote_type_${i}`);
+      const selSeq  = document.getElementById(`remote_seq_${i}`);
+      const inpUrl  = document.getElementById(`remote_url_${i}`);
+
+      if (selType) selType.value = cfg.type || 'none';
+
+      if (cfg.type === 'seq'){
+        if (selSeq){
+          selSeq.style.display = '';
+          selSeq.value = cfg.value || '';
+        }
+        if (inpUrl){
+          inpUrl.style.display = 'none';
+          inpUrl.value = '';
+        }
+      } else if (cfg.type === 'url'){
+        if (selSeq){
+          selSeq.style.display = 'none';
+        }
+        if (inpUrl){
+          inpUrl.style.display = '';
+          inpUrl.value = cfg.value || '';
+        }
+      } else {
+        if (selSeq){
+          selSeq.style.display = '';
+          selSeq.value = '';
+        }
+        if (inpUrl){
+          inpUrl.style.display = 'none';
+          inpUrl.value = '';
+        }
+      }
     }
   }
 
   function remoteChanged(i){
-    const sel = document.getElementById(`remote_type_${i}`);
-    const inp = document.getElementById(`remote_value_${i}`);
-    if (!sel || !inp) return;
-    remoteCfg[i] = {
-      type: sel.value || 'none',
-      value: (inp.value || '').trim()
-    };
+    const selType = document.getElementById(`remote_type_${i}`);
+    const selSeq  = document.getElementById(`remote_seq_${i}`);
+    const inpUrl  = document.getElementById(`remote_url_${i}`);
+    if (!selType || !selSeq || !inpUrl) return;
+
+    const type = selType.value || 'none';
+
+    if (type === 'seq'){
+      selSeq.style.display = '';
+      inpUrl.style.display = 'none';
+      remoteCfg[i] = {
+        type: 'seq',
+        value: selSeq.value || ''
+      };
+    } else if (type === 'url'){
+      selSeq.style.display = 'none';
+      inpUrl.style.display = '';
+      remoteCfg[i] = {
+        type: 'url',
+        value: (inpUrl.value || '').trim()
+      };
+    } else {
+      selSeq.style.display = '';
+      inpUrl.style.display = 'none';
+      remoteCfg[i] = {
+        type: 'none',
+        value: ''
+      };
+    }
   }
 
-  function remoteFire(i){
+  // společné jádro pro tlačítka (dospělý / dítě)
+  function remoteFireGeneric(i, options){
     const cfg = remoteCfg[i] || {type:'none', value:''};
-    const statusEl = document.getElementById('remoteStatus');
+    const statusId = options && options.statusElementId ? options.statusElementId : 'remoteStatus';
+    const silentIfUnconfigured = options && options.silentIfUnconfigured;
+    const statusEl = document.getElementById(statusId);
+
     if (cfg.type === 'none' || !cfg.type){
-      alert('Toto tlačítko zatím nemá přiřazenou akci.');
+      if (!silentIfUnconfigured) alert('Toto tlačítko zatím nemá přiřazenou akci.');
+      if (statusEl) statusEl.textContent = 'Tlačítko není nakonfigurováno.';
       return;
     }
     if (!cfg.value && cfg.type !== 'none'){
-      alert('Pro toto tlačítko chybí název sekvence nebo URL.');
+      if (!silentIfUnconfigured) alert('Pro toto tlačítko chybí název sekvence nebo URL.');
+      if (statusEl) statusEl.textContent = 'Chybí název sekvence nebo URL.';
+      return;
+    }
+
+    // sekvence spouštíme lokálně – načteme z LittleFS a interpretujeme
+    if (cfg.type === 'seq'){
+      const name = cfg.value.trim();
+      runNamedSequence(name, statusId, silentIfUnconfigured);
       return;
     }
 
     let url = '';
-    if (cfg.type === 'seq'){
-      const name = cfg.value.trim();
-      url = `/api/seq_run?name=${encodeURIComponent(name)}`;
-    } else if (cfg.type === 'url'){
+    if (cfg.type === 'url'){
       let v = cfg.value.trim();
       if (!v.startsWith('/')) v = '/' + v;
       url = v;
     }
 
-    statusEl.textContent = 'Odesílám příkaz...';
+    if (statusEl) statusEl.textContent = 'Odesílám příkaz...';
     fetch(url)
       .then(r=>r.text())
-      .then(t=>{ statusEl.textContent = t; })
+      .then(t=>{ if (statusEl) statusEl.textContent = t; })
       .catch(e=>{
         console.error(e);
-        statusEl.textContent = 'Chyba při odesílání příkazu.';
+        if (statusEl) statusEl.textContent = 'Chyba při odesílání příkazu.';
       });
+  }
+
+  function remoteFire(i){
+    // režim dospělého – klasické chování
+    remoteFireGeneric(i, {statusElementId:'remoteStatus', silentIfUnconfigured:false});
+  }
+
+  function kidRemoteFire(i){
+    // režim dítěte – bez alertů, tichý fallback
+    remoteFireGeneric(i, {statusElementId:'kidStatus', silentIfUnconfigured:true});
   }
 
   function saveRemoteConfig(){
     const statusEl = document.getElementById('remoteStatus');
     const promises = [];
     for (let i=0;i<REMOTE_BTN_COUNT;i++){
-      const sel = document.getElementById(`remote_type_${i}`);
-      const inp = document.getElementById(`remote_value_${i}`);
-      const type = sel ? sel.value : 'none';
-      const val  = inp ? (inp.value || '').trim() : '';
-      remoteCfg[i] = {type, value: val};
+      const cfg = remoteCfg[i] || {type:'none', value:''};
+      const type = cfg.type || 'none';
+      const val  = cfg.value || '';
       const url = `/api/remote_save?idx=${i}&type=${encodeURIComponent(type)}&value=${encodeURIComponent(val)}`;
       promises.push(fetch(url).then(r=>r.text()));
     }
-    statusEl.textContent = 'Ukládám nastavení ovladače...';
+    if (statusEl) statusEl.textContent = 'Ukládám nastavení ovladače...';
     Promise.all(promises)
-      .then(()=>{ statusEl.textContent = 'Nastavení ovladače uloženo.'; })
+      .then(()=>{ if (statusEl) statusEl.textContent = 'Nastavení ovladače uloženo.'; })
       .catch(e=>{
         console.error(e);
-        statusEl.textContent = 'Chyba při ukládání nastavení ovladače.';
+        if (statusEl) statusEl.textContent = 'Chyba při ukládání nastavení ovladače.';
       });
   }
 
   // ----- OTTO diagram – spuštění sekvencí -----
-  function ottoSeqFire(inputId){
+  function ottoSeqFireGeneric(inputId, options){
     const inp = document.getElementById(inputId);
-    const statusEl = document.getElementById('remoteStatus');
+    const statusId = options && options.statusElementId ? options.statusElementId : 'remoteStatus';
+    const silentIfEmpty = options && options.silentIfEmpty;
+    const statusEl = document.getElementById(statusId);
+
     if (!inp){
-      alert('Vnitřní chyba: nenalezen input pro sekvenci.');
+      if (!silentIfEmpty) alert('Vnitřní chyba: nenalezen prvek pro sekvenci.');
+      if (statusEl) statusEl.textContent = 'Chyba: nenalezen prvek pro sekvenci.';
       return;
     }
     const name = (inp.value || '').trim();
     if (!name){
-      alert('Zadej název sekvence (bez "seq_") pro toto tlačítko.');
+      if (!silentIfEmpty) alert('Vyber sekvenci pro toto tlačítko.');
+      if (statusEl) statusEl.textContent = 'Chybí název sekvence.';
       return;
     }
 
-    if (statusEl) statusEl.textContent = 'Odesílám sekvenci...';
-    fetch(`/api/seq_run?name=${encodeURIComponent(name)}`)
-      .then(r=>r.text())
-      .then(t=>{
-        if (statusEl) statusEl.textContent = t;
-      })
-      .catch(e=>{
-        console.error(e);
-        if (statusEl) statusEl.textContent = 'Chyba při odesílání sekvence.';
-      });
+    // sekvence spouštíme lokálně z LittleFS
+    runNamedSequence(name, statusId, silentIfEmpty);
+  }
+
+  function ottoSeqFire(inputId){
+    // dospělý – s alerty, stav do remoteStatus
+    ottoSeqFireGeneric(inputId, {statusElementId:'remoteStatus', silentIfEmpty:false});
+  }
+
+  function kidOttoSeqFire(inputId){
+    // dítě – bez alertů, stav do kidStatus
+    ottoSeqFireGeneric(inputId, {statusElementId:'kidStatus', silentIfEmpty:true});
   }
 
   // ----- File manager -----
   function loadFsList(){
-  fetch('/api/fs_list')
-    .then(r => r.json())
-    .then(data => {
-      const list = document.getElementById('fsList');
-      list.innerHTML = '';
-      (data.files || []).forEach(f => {
-        const div = document.createElement('div');
-        div.className = 'file-list-item';
-        div.innerHTML = `
-          <div>
-            <div class="file-name">${f.name}</div>
-            <div class="meta">${f.size} B</div>
-          </div>
-          <div class="file-actions">
-            <button onclick="fsQuickLoad('${f.name}')">Načíst</button>
-            <button class="danger" onclick="fsQuickDelete('${f.name}')">Smazat</button>
-          </div>
-        `;
-        list.appendChild(div);
-      });
+    fetch('/api/fs_list')
+      .then(r => r.json())
+      .then(data => {
+        const list = document.getElementById('fsList');
+        list.innerHTML = '';
+        (data.files || []).forEach(f => {
+          const div = document.createElement('div');
+          div.className = 'file-list-item';
+          div.innerHTML = `
+            <div>
+              <div class="file-name">${f.name}</div>
+              <div class="meta">${f.size} B</div>
+            </div>
+            <div class="file-actions">
+              <button onclick="fsQuickLoad('${f.name}')">Načíst</button>
+              <button class="danger" onclick="fsQuickDelete('${f.name}')">Smazat</button>
+            </div>
+          `;
+          list.appendChild(div);
+        });
 
-      if (!data.files || !data.files.length) {
-        list.innerHTML = '<div class="file-list-item"><span class="small">Žádné soubory v LittleFS.</span></div>';
-      }
-    })
-    .catch(e => {
-      console.error(e);
-      const list = document.getElementById('fsList');
-      if (list) {
-        list.innerHTML = '<div class="file-list-item"><span class="small">Chyba při načítání seznamu souborů.</span></div>';
-      }
-    });
-}
+        if (!data.files || !data.files.length) {
+          list.innerHTML = '<div class="file-list-item"><span class="small">Žádné soubory v LittleFS.</span></div>';
+        }
+      })
+      .catch(e => {
+        console.error(e);
+        const list = document.getElementById('fsList');
+        if (list) {
+          list.innerHTML = '<div class="file-list-item"><span class="small">Chyba při načítání seznamu souborů.</span></div>';
+        }
+      });
+  }
 
   function fsQuickLoad(path){
     const input = document.getElementById('fsPath');
@@ -1421,19 +1935,18 @@
 
   window.addEventListener('load', ()=>{
     initIpBadge();
-  loadServoSwapFromStorage();
+    loadServoSwapFromStorage();
     buildServoUI();
     initTabs();
     loadConfigFromDevice();
     refreshStatus();
     loadFsList();
-    loadSeqList();
-    // načteme i seznam sekvencí pro našeptávání v remote tabulce
-    refreshRemoteSeqSuggestions();
+    loadSeqList(); // zároveň naplní dropdowny pro sekvence
+    // naváže změny OTTO diagramu do localStorage
+    initOttoDiagramBindings();
     // pravidelná aktualizace stavu serv
     setInterval(refreshStatus, 4000);
   });
 </script>
 </body>
 </html>
-
